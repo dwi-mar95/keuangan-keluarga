@@ -311,6 +311,84 @@ async function pullFromSpreadsheet(force = false) {
         updatedCount++;
       }
 
+      // 8. Sinkronisasi Investasi & Dana Darurat
+      if (Array.isArray(data.investments) && data.investments.length > 0) {
+        const savedInv = JSON.parse(localStorage.getItem("keuangan_keluarga_investments") || '{"gold":[],"mutualFunds":[],"propertyRealAssets":[],"debts":[]}');
+        const goldList = [];
+        const fundList = [];
+        data.investments.forEach((row, idx) => {
+          const type = String(row["Jenis Aset"] || "");
+          const brandOrName = String(row["Instrumen / Brand"] || "");
+          const gramStr = String(row["Gram / Jumlah"] || "0");
+          const modal = Number(row["Modal Beli (Rp)"]) || 0;
+          const market = Number(row["Estimasi Nilai Pasar (Rp)"]) || 0;
+          if (type.includes("Logam") || type.includes("Emas")) {
+            const grams = parseFloat(gramStr.replace(/[^\d.]/g, "")) || 0;
+            goldList.push({
+              id: "g_sheet_" + (idx + 1),
+              brand: brandOrName || "Antam",
+              grams: grams,
+              buyPricePerGram: grams > 0 ? Math.round(modal / grams) : modal,
+              currentPricePerGram: grams > 0 ? Math.round(market / grams) : market,
+              date: new Date().toISOString()
+            });
+          } else if (type.includes("Reksa") || type.includes("Dana") || type.includes("Pasar Uang")) {
+            fundList.push({
+              id: "mf_sheet_" + (idx + 1),
+              name: brandOrName,
+              capital: modal,
+              currentValue: market
+            });
+          }
+        });
+        if (goldList.length > 0) savedInv.gold = goldList;
+        if (fundList.length > 0) savedInv.mutualFunds = fundList;
+        localStorage.setItem("keuangan_keluarga_investments", JSON.stringify(savedInv));
+        updatedCount++;
+      }
+
+      // 9. Sinkronisasi Pendidikan Anak & Istri
+      if (Array.isArray(data.education) && data.education.length > 0) {
+        const mappedEdu = data.education.map((e, idx) => ({
+          id: "edu_" + (idx + 1),
+          title: e["Pos Pendidikan"] || "Pendidikan",
+          person: e["Peruntukan"] || "Anak",
+          amount: Number(e["Estimasi Biaya (Rp)"]) || 0,
+          cycle: e["Siklus Pembayaran"] || "Bulanan",
+          status: e["Status"] === "Aktif" ? "active" : "upcoming"
+        }));
+        localStorage.setItem("keuangan_keluarga_education_plans", JSON.stringify(mappedEdu));
+        updatedCount++;
+      }
+
+      // 10. Sinkronisasi Bakti Orang Tua & Mertua
+      if (Array.isArray(data.parents) && data.parents.length > 0) {
+        const mappedParents = data.parents.map((p, idx) => ({
+          id: "par_" + (idx + 1),
+          name: p["Nama Penerima"] || "Orang Tua",
+          relation: p["Hubungan"] || "Orang Tua",
+          amount: Number(p["Nominal Rutin (Rp)"]) || 1000000,
+          defaultWallet: p["Dompet Penyalur"] || "Rekening BCA",
+          note: p["Keterangan"] || ""
+        }));
+        localStorage.setItem("keuangan_keluarga_parents", JSON.stringify(mappedParents));
+        updatedCount++;
+      }
+
+      // 11. Sinkronisasi Servis Kendaraan
+      if (Array.isArray(data.vehicles) && data.vehicles.length > 0) {
+        const mappedVehicles = data.vehicles.map((v, idx) => ({
+          id: "veh_" + (idx + 1),
+          name: v["Nama Kendaraan"] || "Kendaraan",
+          type: (v["Jenis"] || "").toLowerCase().includes("mobil") ? "mobil" : "motor",
+          plat: v["Plat Nomor"] || "-",
+          nextOilDate: v["Jadwal Ganti Oli Berikutnya"] || "",
+          note: v["Keterangan"] || ""
+        }));
+        localStorage.setItem("keuangan_keluarga_vehicles", JSON.stringify(mappedVehicles));
+        updatedCount++;
+      }
+
 
       // Render ulang tampilan dashboard
       if (window.AppModule && window.AppModule.renderDashboard) {

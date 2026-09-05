@@ -3132,6 +3132,9 @@
       item.dueDate = newDate ? newDate.trim() : "";
 
       window.IbuGasModule.saveTempoRecords(records);
+      if (window.SyncModule && window.SyncModule.pushTransactionToSyncQueue) {
+        window.SyncModule.pushTransactionToSyncQueue("update_ibu_tempo", item);
+      }
       renderIbuGasBonList();
       showToast(`Catatan tempo untuk ${newName} berhasil diperbarui! ✨`, "success");
     }

@@ -128,6 +128,17 @@ function doGet(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (action === "ping") {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        version: "2.3.0",
+        message: "Google Apps Script Turbo Engine Online & Ready for Baba Pangestu & Umma Atin",
+        serverTime: Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd HH:mm:ss"),
+        spreadsheetName: ss.getName(),
+        sheetsAvailable: OFFICIAL_11_SHEETS_WHITELIST.filter(name => ss.getSheetByName(name) !== null)
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     return ContentService.createTextOutput(JSON.stringify({
       status: "success",
       message: "Google Apps Script Turbo Engine Online & Ready for Baba Pangestu & Umma Atin"
@@ -328,6 +339,22 @@ function handleSingleSyncItem(ss, item) {
         if (String(data[r][0]) === String(p.id)) {
           sheet.getRange(r + 1, 7).setValue("Lunas");
           sheet.getRange(r + 1, 8).setValue(p.payDate || formattedDateWIB);
+          break;
+        }
+      }
+    }
+  }
+
+  // 7b. UPDATE TEMPO USAHA IBU (CRUD EDIT)
+  else if (action === "update_ibu_tempo") {
+    const sheet = getSheetSafe(ss, "Usaha_Ibu_Tempo");
+    if (sheet) {
+      const data = sheet.getDataRange().getValues();
+      for (let r = 1; r < data.length; r++) {
+        if (String(data[r][0]) === String(p.id)) {
+          if (p.customerName || p.title) sheet.getRange(r + 1, 4).setValue(p.customerName || p.title);
+          if (p.amount !== undefined) sheet.getRange(r + 1, 5).setValue(Number(p.amount) || 0);
+          if (p.dueDate !== undefined) sheet.getRange(r + 1, 6).setValue(p.dueDate || "-");
           break;
         }
       }
@@ -549,6 +576,18 @@ function handleSingleSyncItem(ss, item) {
             (Number(g.buyPricePerGram) || 0) * (Number(g.grams) || 0),
             (Number(g.currentPricePerGram) || 0) * (Number(g.grams) || 0),
             "Aset Tabungan Emas"
+          ]);
+        });
+      }
+      if (Array.isArray(inv.mutualFunds)) {
+        inv.mutualFunds.forEach(mf => {
+          sInv.appendRow([
+            "Reksa Dana / Pasar Uang",
+            mf.name || "Reksa Dana Syariah",
+            "1 Portofolio",
+            Number(mf.capital) || 0,
+            Number(mf.currentValue) || Number(mf.capital) || 0,
+            "Aset Portofolio Reksa Dana"
           ]);
         });
       }
