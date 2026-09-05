@@ -1,0 +1,22 @@
+{
+  "name": "Keuangan Keluarga & Usaha Ibu",
+  "short_name": "Keuangan Kita",
+  "description": "Catatan Keuangan Pribadi & Keluarga Mas Pangestu dan Bunda serta Usaha Ibu",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#10b981",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://api.iconify.design/lucide:wallet.svg?color=%2310b981",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "https://api.iconify.design/lucide:wallet.svg?color=%2310b981",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

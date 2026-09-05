@@ -1,0 +1,136 @@
+---
+---
+    <section id="sectionIbu" class="space-y-4 hidden">
+      
+      <!-- Banner Usaha Ibu -->
+      <div class="glass-card p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200/80 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <div class="text-[10px] font-extrabold text-amber-800 uppercase tracking-wider">
+            🏢 Buku Kas Terpisah Usaha Ibu
+          </div>
+          <h2 class="text-base font-black text-slate-900 mt-0.5">
+            Kost-Kostan & Penjualan Gas Eceran
+          </h2>
+          <p class="text-xs text-slate-500">
+            Supplier Gas Resmi: <strong>Bu Yanto</strong> & <strong>Mas Aan</strong>
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="openIbuSettingsModal()" class="px-3 py-1.5 rounded-xl bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 font-bold text-xs cursor-pointer shadow-2xs">
+            ⚙️ Atur / Kosongkan ke Rp 0
+          </button>
+          <button onclick="openNewIbuTxModal()" class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs cursor-pointer shadow-sm">
+            + Catat Transaksi Ibu
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Usaha Ibu -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="glass-card p-3.5 space-y-1">
+          <div class="text-[10px] font-bold text-slate-400 uppercase">Sewa Kost Lunas</div>
+          <div id="ibuKostReceived" class="text-lg font-black text-emerald-600">Rp 0</div>
+          <div class="text-[9px] text-slate-400 font-semibold">Bulan ini</div>
+        </div>
+
+        <div class="glass-card p-3.5 space-y-1">
+          <div class="text-[10px] font-bold text-slate-400 uppercase">Sewa Kost Belum Bayar</div>
+          <div id="ibuKostPending" class="text-lg font-black text-rose-600">Rp 0</div>
+          <div class="text-[9px] text-slate-400 font-semibold">Kamar pending</div>
+        </div>
+
+        <div class="glass-card p-3.5 space-y-1">
+          <div class="text-[10px] font-bold text-slate-400 uppercase">Tabung Gas Isi (Siap)</div>
+          <div id="ibuGasReady" class="text-lg font-black text-amber-600">0 Tabung</div>
+          <div class="text-[9px] text-slate-400 font-semibold">Stok warung</div>
+        </div>
+
+        <div class="glass-card p-3.5 space-y-1">
+          <div class="text-[10px] font-bold text-slate-400 uppercase">Tabung Gas Kosong</div>
+          <div id="ibuGasEmpty" class="text-lg font-black text-slate-700">0 Tabung</div>
+          <div class="text-[9px] text-slate-400 font-semibold">Siap kulakan supplier</div>
+        </div>
+      </div>
+
+      <!-- 2 Modul Usaha Ibu: Kost & Gas -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        <!-- Kartu 1: Kost-Kostan Ibu (100% Dinamis) -->
+        <div class="glass-card p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+            <h3 class="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+              🏠 Kamar Kost-Kostan
+            </h3>
+            <div class="flex items-center gap-2">
+              <span id="ibuKostTotalCount" class="text-[10px] font-bold text-slate-400">Total 4 Kamar</span>
+              <button onclick="openKostRoomEditModal(null)" class="px-2 py-0.5 rounded-md bg-emerald-100 hover:bg-emerald-200 text-[10.5px] font-black text-emerald-800 cursor-pointer transition-all flex items-center gap-1" title="Tambah Kamar Kost Baru">
+                <span>+ Kamar</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="ibuKostList" class="space-y-2">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Kartu 2: Penjualan Gas Eceran & Buku Piutang/Tempo -->
+        <div class="glass-card p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+            <h3 class="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+              🍳 Jual Gas LPG & Tempo
+            </h3>
+            <div class="flex gap-1.5">
+              <button onclick="openGasQuickModal('restock')" class="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-[10px] font-bold text-slate-700 cursor-pointer">
+                + Kulakan
+              </button>
+              <button onclick="openGasQuickModal('sale')" class="px-2 py-0.5 rounded-md bg-amber-100 hover:bg-amber-200 text-[10px] font-bold text-amber-800 cursor-pointer">
+                + Jual Gas
+              </button>
+              <button onclick="openNewTempoPrompt()" class="px-2 py-0.5 rounded-md bg-purple-100 hover:bg-purple-200 text-[10px] font-bold text-purple-800 cursor-pointer" title="Catat Bon / Tempo">
+                + Tempo
+              </button>
+            </div>
+          </div>
+
+          <!-- Bon Pelanggan Gas & Tempo Usaha Ibu -->
+          <div class="space-y-2">
+            <div class="text-[10px] font-extrabold text-slate-500 uppercase flex items-center justify-between">
+              <span>Buku Piutang & Tempo Usaha Ibu:</span>
+              <span id="ibuTempoCountBadge" class="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-bold">2 Aktif</span>
+            </div>
+            <div id="ibuGasBonList" class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+              <!-- Populated by JS -->
+            </div>
+        </div>
+
+      </div>
+
+      <!-- Kartu 3: Riwayat Transaksi & Log Kas Usaha Ibu -->
+      <div class="glass-card p-4 space-y-3 mt-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+          <div class="flex items-center gap-2">
+            <h3 class="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+              <span>📜</span> Riwayat Transaksi & Log Kas Usaha Ibu
+            </h3>
+            <span id="ibuTxCountBadge" class="text-[9.5px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-black">0 Transaksi</span>
+          </div>
+          
+          <!-- Filter Cepat Unit Usaha -->
+          <div class="flex items-center gap-1.5 text-xs">
+            <select id="ibuTxFilterUnit" onchange="renderIbuTransactionList()" class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-[11px] font-bold text-slate-700 outline-none cursor-pointer">
+              <option value="all">Semua Unit (Kost & Gas)</option>
+              <option value="kost">🏠 Khusus Kost</option>
+              <option value="gas">🍳 Khusus Gas LPG</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Daftar Log Transaksi Usaha Ibu -->
+        <div id="ibuTransactionsList" class="space-y-2 max-h-96 overflow-y-auto pr-1">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+    </section>
+

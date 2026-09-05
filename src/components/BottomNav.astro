@@ -1,0 +1,33 @@
+---
+---
+  <!-- ================= FLOATING ACTION BUTTON (FAB) ================= -->
+  <button onclick="openQuickAddModal()" class="fab-btn no-print" title="Catat Cepat Transaksi">
+    <i data-lucide="plus" class="w-6 h-6"></i>
+  </button>
+
+  <!-- ================= BOTTOM NAVIGATION MOBILE ================= -->
+  <nav class="bottom-nav no-print">
+    <div onclick="switchLedger('keluarga')" class="bottom-nav-item active" id="navItemKeluarga">
+      <i data-lucide="home" class="w-5 h-5"></i>
+      <span>Keluarga</span>
+    </div>
+    <div onclick="openTabModal('bills')" class="bottom-nav-item">
+      <i data-lucide="calendar" class="w-5 h-5"></i>
+      <span>Tagihan</span>
+    </div>
+    <div onclick="openQuickAddModal()" class="bottom-nav-item text-emerald-600 font-extrabold">
+      <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center -mt-3 shadow-sm">
+        <i data-lucide="plus" class="w-5 h-5 text-emerald-700"></i>
+      </div>
+      <span>Catat</span>
+    </div>
+    <div onclick="switchLedger('ibu')" class="bottom-nav-item" id="navItemIbu">
+      <i data-lucide="store" class="w-5 h-5"></i>
+      <span>Usaha Ibu</span>
+    </div>
+    <div onclick="openSettingsModal()" class="bottom-nav-item">
+      <i data-lucide="settings" class="w-5 h-5"></i>
+      <span>Setting</span>
+    </div>
+  </nav>
+

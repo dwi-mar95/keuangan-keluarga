@@ -1,0 +1,345 @@
+/* styles.css - Desain Cerah, Modern, Glassmorphism & Mobile-First */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --primary: #10b981;
+  --primary-hover: #059669;
+  --primary-light: #ecfdf5;
+  --primary-dark: #064e3b;
+  --accent: #f59e0b;
+  --bg-main: #f8fafc;
+  --card-bg: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+}
+
+[data-theme="amber"] {
+  --primary: #f59e0b;
+  --primary-hover: #d97706;
+  --primary-light: #fffbeb;
+  --primary-dark: #78350f;
+}
+
+[data-theme="blue"] {
+  --primary: #0ea5e9;
+  --primary-hover: #0284c7;
+  --primary-light: #f0f9ff;
+  --primary-dark: #0c4a6e;
+}
+
+[data-theme="purple"] {
+  --primary: #8b5cf6;
+  --primary-hover: #7c3aed;
+  --primary-light: #f5f3ff;
+  --primary-dark: #4c1d95;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  min-height: 100vh;
+  padding-bottom: 80px; /* space for mobile bottom nav */
+}
+
+/* Glassmorphism Card */
+.glass-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03);
+}
+
+/* Numpad Keypad */
+.numpad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.numpad-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.numpad-btn {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.numpad-btn:active {
+  background: #e2e8f0;
+  transform: scale(0.96);
+}
+
+.numpad-op-btn {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  font-weight: 800;
+  font-size: 20px;
+}
+.numpad-op-btn:hover {
+  background: #e2e8f0;
+}
+.numpad-op-btn:active {
+  background: #cbd5e1;
+  transform: scale(0.95);
+}
+
+/* Goals Progress Bar Gradient */
+.goal-progress-bar {
+  background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+
+/* Floating Action Button (FAB) */
+.fab-btn {
+  position: fixed;
+  bottom: 84px;
+  right: 20px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  color: #ffffff;
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4);
+  cursor: pointer;
+  z-index: 40;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.fab-btn:hover {
+  transform: scale(1.08) translateY(-2px);
+}
+
+.fab-btn:active {
+  transform: scale(0.95);
+}
+
+/* Bottom Nav for Mobile */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  z-index: 50;
+  box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.03);
+}
+
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.bottom-nav-item.active {
+  color: var(--primary);
+  font-weight: 800;
+}
+
+/* Modal Backdrop */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center; /* Center on all devices so bottom badges never block buttons */
+  justify-content: center;
+  padding: 16px;
+  z-index: 100000;
+  transition: opacity 0.2s ease;
+}
+
+/* Sub-modals yang dibuka dari dalam modal lain (agar selalu tampil paling depan) */
+#categoryManagerModal,
+#walletManagerModal,
+#presetsManagerModal,
+#manageFeaturesModal {
+  z-index: 110000 !important;
+}
+
+/* Kotak Dialog Konfirmasi & Prompt (selalu di atas modal) */
+#customConfirmModal,
+#customPromptModal {
+  z-index: 120000 !important;
+}
+
+/* Toast Notifikasi (selalu paling depan dari segala elemen) */
+#toastContainer {
+  z-index: 130000 !important;
+}
+
+/* Jendela Rekam Suara & Scan OCR Struk (selalu di paling depan) */
+#voiceListeningModal,
+#ocrScanningModal {
+  z-index: 140000 !important;
+}
+
+.modal-content {
+  background: #ffffff;
+  width: 100%;
+  max-width: 520px;
+  max-height: 88vh;
+  overflow-y: auto;
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.25);
+  position: relative;
+}
+
+/* Sembunyikan elemen badge / drawer bawaan Netlify */
+iframe[src*="netlify"],
+netlify-drawer,
+[data-netlify-drawer],
+#netlify-drawer,
+.netlify-drawer,
+[class*="netlify-badge"],
+[id*="netlify-badge"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Print Styles */
+@media print {
+  body {
+    background: #ffffff;
+    padding-bottom: 0;
+  }
+  .no-print, .fab-btn, .bottom-nav {
+    display: none !important;
+  }
+}
+
+
+/* Dynamic Theme Overrides */
+[data-theme="emerald"] {
+  --primary: #10b981;
+  --primary-hover: #059669;
+  --primary-light: #ecfdf5;
+  --primary-dark: #064e3b;
+  --accent: #f59e0b;
+}
+
+[data-theme="amber"] {
+  --primary: #f59e0b;
+  --primary-hover: #d97706;
+  --primary-light: #fffbeb;
+  --primary-dark: #78350f;
+  --accent: #10b981;
+}
+
+[data-theme="blue"] {
+  --primary: #0ea5e9;
+  --primary-hover: #0284c7;
+  --primary-light: #f0f9ff;
+  --primary-dark: #0c4a6e;
+  --accent: #f59e0b;
+}
+
+[data-theme="purple"] {
+  --primary: #8b5cf6;
+  --primary-hover: #7c3aed;
+  --primary-light: #f5f3ff;
+  --primary-dark: #4c1d95;
+  --accent: #ec4899;
+}
+
+/* Apply theme variable to interactive elements */
+.theme-btn-primary {
+  background-color: var(--primary) !important;
+}
+.theme-btn-primary:hover {
+  background-color: var(--primary-hover) !important;
+}
+.theme-text-primary {
+  color: var(--primary) !important;
+}
+.theme-bg-light {
+  background-color: var(--primary-light) !important;
+}
+.theme-border-primary {
+  border-color: var(--primary) !important;
+}
+
+/* PIN Lock Screen Animations & Styles */
+@keyframes pinShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-9px); }
+  40%, 80% { transform: translateX(9px); }
+}
+
+.pin-shake {
+  animation: pinShake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+.pin-keypad-btn {
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(51, 65, 85, 0.8);
+  border-radius: 16px;
+  padding: 15px 10px;
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  user-select: none;
+  touch-action: manipulation;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
+
+.pin-keypad-btn:hover {
+  background: rgba(51, 65, 85, 0.95);
+  border-color: rgba(71, 85, 105, 1);
+  transform: translateY(-1px);
+}
+
+.pin-keypad-btn:active, .pin-keypad-btn.active-key {
+  transform: scale(0.93) translateY(1px);
+  background: rgba(71, 85, 105, 1);
+  border-color: rgba(52, 211, 153, 0.8);
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.4);
+}
+

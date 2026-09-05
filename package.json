@@ -1,0 +1,15 @@
+{
+  "name": "keuangan-keluarga",
+  "type": "module",
+  "version": "2.0.0",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build && node -e \"const fs=require('fs'); fs.copyFileSync('dist/index.html', 'index.html'); if(fs.existsSync('dist/_astro')) fs.cpSync('dist/_astro', '_astro', {recursive:true});\"",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "astro": "^5.4.2"
+  }
+}

@@ -1,0 +1,28 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/Header.astro';
+import KeluargaDashboard from '../components/keluarga/KeluargaDashboard.astro';
+import IbuDashboard from '../components/usaha-ibu/IbuDashboard.astro';
+import BottomNav from '../components/BottomNav.astro';
+import GlobalModals from '../components/modals/GlobalModals.astro';
+import PinLock from '../components/PinLock.astro';
+---
+
+<Layout title="Catatan Keuangan Keluarga Baba & Umma + Usaha Ibu">
+  <Header />
+
+  <!-- Main Responsive Container (Bright & Modern) -->
+  <main class="max-w-5xl mx-auto px-4 py-4 space-y-4">
+    <KeluargaDashboard />
+    <IbuDashboard />
+  </main>
+
+  <!-- Floating Action Button & Mobile Bottom Navigation -->
+  <BottomNav />
+
+  <!-- Global Application Modals -->
+  <GlobalModals />
+
+  <!-- PIN Lock Screen Security Overlay -->
+  <PinLock />
+</Layout>

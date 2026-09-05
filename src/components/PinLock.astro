@@ -1,0 +1,57 @@
+---
+---
+  <!-- ================= PIN LOCK SCREEN OVERLAY ================= -->
+  <div id="pinLockScreen" class="fixed inset-0 z-50 bg-slate-900/95 backdrop-blur-xl flex items-center justify-center p-4 select-none">
+    <div class="max-w-xs w-full text-center space-y-5">
+      <div class="space-y-2">
+        <div class="w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-3xl mx-auto shadow-lg">
+          🔐
+        </div>
+        <h2 class="text-lg font-black text-white tracking-wide">Keuangan Keluarga</h2>
+        <p class="text-xs text-slate-400 font-medium">Masukkan PIN Rahasia Keluarga:</p>
+      </div>
+
+      <!-- PIN Dots Display with shake container -->
+      <div id="pinDotsContainer" class="flex justify-center gap-2.5 py-1">
+        <div id="pinDot0" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 transition-all"></div>
+        <div id="pinDot1" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 transition-all"></div>
+        <div id="pinDot2" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 transition-all"></div>
+        <div id="pinDot3" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 transition-all"></div>
+      </div>
+
+      <div id="pinErrorMessage" class="text-xs font-bold text-rose-400 h-5 transition-all"></div>
+
+      <!-- Numpad Keypad for PIN -->
+      <div class="numpad-grid pt-1">
+        <button type="button" id="pinBtn_1" onclick="pressPinKey('1')" class="pin-keypad-btn">1</button>
+        <button type="button" id="pinBtn_2" onclick="pressPinKey('2')" class="pin-keypad-btn">2</button>
+        <button type="button" id="pinBtn_3" onclick="pressPinKey('3')" class="pin-keypad-btn">3</button>
+        <button type="button" id="pinBtn_4" onclick="pressPinKey('4')" class="pin-keypad-btn">4</button>
+        <button type="button" id="pinBtn_5" onclick="pressPinKey('5')" class="pin-keypad-btn">5</button>
+        <button type="button" id="pinBtn_6" onclick="pressPinKey('6')" class="pin-keypad-btn">6</button>
+        <button type="button" id="pinBtn_7" onclick="pressPinKey('7')" class="pin-keypad-btn">7</button>
+        <button type="button" id="pinBtn_8" onclick="pressPinKey('8')" class="pin-keypad-btn">8</button>
+        <button type="button" id="pinBtn_9" onclick="pressPinKey('9')" class="pin-keypad-btn">9</button>
+        <button type="button" id="pinBtn_clear" onclick="clearPinKey()" class="pin-keypad-btn text-slate-400 text-sm">C</button>
+        <button type="button" id="pinBtn_0" onclick="pressPinKey('0')" class="pin-keypad-btn">0</button>
+        <button type="button" id="pinBtn_del" onclick="backspacePinKey()" class="pin-keypad-btn text-rose-400">⌫</button>
+      </div>
+
+      <!-- Options: Remember Device & Hint -->
+      <div class="flex items-center justify-between text-[11px] text-slate-400 px-1 pt-1">
+        <label class="flex items-center gap-1.5 cursor-pointer hover:text-slate-300">
+          <input type="checkbox" id="pinRememberDevice" checked class="rounded accent-emerald-500 cursor-pointer">
+          <span>Ingat di perangkat ini</span>
+        </label>
+        <button type="button" onclick="showPinHint()" class="text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer font-semibold flex items-center gap-0.5">
+          <span>💡 Petunjuk PIN</span>
+        </button>
+      </div>
+
+      <div class="space-y-0.5 pt-1">
+        <p class="text-[10px] font-semibold text-slate-400">PIN Keluarga Baba Pangestu &amp; Umma Atin</p>
+        <p class="text-[9px] text-slate-500">Ketik via keyboard laptop atau sentuh tombol layar HP</p>
+      </div>
+    </div>
+  </div>
+

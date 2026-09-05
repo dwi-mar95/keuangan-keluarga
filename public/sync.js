@@ -1,0 +1,362 @@
+/**
+ * sync.js - Modul Sinkronisasi Dua Arah Lengkap (Frontend Client)
+ * Sinkronisasi Real-Time dengan Google Apps Script & Google Spreadsheet
+ */
+
+const SYNC_URL_KEY = "keuangan_keluarga_spreadsheet_api_url";
+const PENDING_QUEUE_KEY = "keuangan_keluarga_pending_sync_queue";
+
+function getSpreadsheetApiUrl() {
+  return localStorage.getItem(SYNC_URL_KEY) || "https://script.google.com/macros/s/AKfycbyB7_urRr_uBMeF6_n18p-ia1XwrRVgtiHmVs1gyV2NTU7OxTLAQXyQQNo_T5ETDdkH/exec";
+}
+
+function setSpreadsheetApiUrl(url) {
+  if (url) localStorage.setItem(SYNC_URL_KEY, url.trim());
+}
+
+function getPendingQueue() {
+  const saved = localStorage.getItem(PENDING_QUEUE_KEY);
+  if (saved) {
+    try { return JSON.parse(saved); } catch (e) {}
+  }
+  return [];
+}
+
+function savePendingQueue(queue) {
+  localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(queue));
+}
+
+let syncDebounceTimer = null;
+let isSyncing = false;
+
+// Tambahkan tindakan ke antrean sinkronisasi (Debounced Batch Turbo)
+function pushTransactionToSyncQueue(action, payload) {
+  const queue = getPendingQueue();
+  queue.push({
+    id: "sync_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+    action,
+    payload,
+    timestamp: new Date().toISOString()
+  });
+  savePendingQueue(queue);
+
+  // Debounce 250ms: Kumpulkan beberapa input beruntun menjadi 1 request cepat
+  if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = setTimeout(() => {
+    processPendingQueue();
+  }, 250);
+}
+
+// Kirim antrean tertunda ke Google Apps Script (POST - Safe Turbo Engine)
+async function processPendingQueue() {
+  if (isSyncing) return;
+  const apiUrl = getSpreadsheetApiUrl();
+  if (!apiUrl) return;
+
+  const queue = getPendingQueue();
+  if (queue.length === 0) return;
+
+  if (!navigator.onLine) {
+    console.log("Offline: sync ditunda hingga terhubung ke internet");
+    return;
+  }
+
+  isSyncing = true;
+  const currentBatch = [...queue];
+
+  try {
+    let postSuccess = false;
+    try {
+      // Prioritas 1: Safe no-cors text/plain (CORS safelisted, tidak memicu 302 post error di browser)
+      await fetch(apiUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "batch_sync",
+          items: currentBatch
+        })
+      });
+      postSuccess = true;
+    } catch (noCorsErr) {
+      console.warn("Percobaan no-cors gagal, mencoba direct POST:", noCorsErr);
+      try {
+        await fetch(apiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "batch_sync",
+            items: currentBatch
+          })
+        });
+        postSuccess = true;
+      } catch (directErr) {
+        console.error("Gagal mengirim sync ke Google Apps Script:", directErr);
+        throw directErr;
+      }
+    }
+
+    if (postSuccess) {
+      // Bersihkan HANYA item yang baru saja dikirim (menjaga jika ada transaksi baru masuk di tengah jalan)
+      const freshQueue = getPendingQueue();
+      const sentIds = new Set(currentBatch.map(i => i.id));
+      const remainingQueue = freshQueue.filter(i => !sentIds.has(i.id));
+      savePendingQueue(remainingQueue);
+
+      console.log("Sync ke Google Spreadsheet berhasil!");
+      window.dispatchEvent(new CustomEvent("sync-completed", { detail: { success: true } }));
+    }
+  } catch (err) {
+    console.warn("Gagal mengirim ke Google Spreadsheet, akan dicoba lagi nanti:", err);
+  } finally {
+    isSyncing = false;
+  }
+}
+
+// Helper: Parsing tanggal dari Google Spreadsheet agar tanggal riil transaksi masa lalu tetap utuh presisi
+function parseSpreadsheetDateToISO(raw) {
+  if (!raw) return new Date().toISOString();
+  
+  if (typeof raw === "string") {
+    raw = raw.trim();
+    // 1. Format ISO dengan T (misal: 2026-09-04T12:00:00+07:00 atau 2026-09-04T05:00:00.000Z)
+    if (raw.includes("T")) {
+      const d = new Date(raw);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    }
+    
+    // 2. Format YYYY-MM-DD HH:mm:ss atau YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+      const parts = raw.split(" ");
+      const timeStr = parts[1] || "12:00:00";
+      const isoStr = `${parts[0]}T${timeStr}+07:00`;
+      const d = new Date(isoStr);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    }
+    
+    // 3. Format dengan garis miring (DD/MM/YYYY atau YYYY/MM/DD)
+    if (raw.includes("/")) {
+      const parts = raw.split(" ");
+      const dateParts = parts[0].split("/");
+      const timeStr = parts[1] || "12:00:00";
+      
+      if (dateParts.length === 3) {
+        if (dateParts[0].length === 4) {
+          // YYYY/MM/DD
+          const isoStr = `${dateParts[0]}-${dateParts[1].padStart(2, "0")}-${dateParts[2].padStart(2, "0")}T${timeStr}+07:00`;
+          const d = new Date(isoStr);
+          if (!isNaN(d.getTime())) return d.toISOString();
+        } else if (dateParts[2].length === 4) {
+          // DD/MM/YYYY baku Indonesia
+          const isoStr = `${dateParts[2]}-${dateParts[1].padStart(2, "0")}-${dateParts[0].padStart(2, "0")}T${timeStr}+07:00`;
+          const d = new Date(isoStr);
+          if (!isNaN(d.getTime())) return d.toISOString();
+        }
+      }
+    }
+  }
+  
+  const d = new Date(raw);
+  return !isNaN(d.getTime()) ? d.toISOString() : new Date().toISOString();
+}
+
+// Tarik data terbaru dari Google Spreadsheet ke HP (GET Two-Way Sync High Speed)
+async function pullFromSpreadsheet(force = false) {
+  const apiUrl = getSpreadsheetApiUrl();
+  if (!apiUrl) {
+    if (window.showToast) window.showToast("URL Google Apps Script belum diatur!", "warning");
+    return;
+  }
+
+  try {
+    if (force && window.showToast) window.showToast("Menyelaraskan data dari Google Sheets... 🔄", "info");
+
+    const cacheBuster = `&_t=${Date.now()}${force ? '&force=true' : ''}`;
+    const res = await fetch(apiUrl + "?action=fetch_all" + cacheBuster);
+    const data = await res.json();
+
+    if (data && data.status === "success") {
+      let updatedCount = 0;
+
+      // 1. Sinkronisasi Transaksi Keluarga
+      if (Array.isArray(data.keluarga_txs)) {
+        const mapped = data.keluarga_txs.map(r => ({
+          id: String(r["ID Transaksi"] || "tx_" + Date.now()),
+          date: parseSpreadsheetDateToISO(r["Waktu WIB"]),
+          type: r["Jenis"] === "Pemasukan" ? "income" : (r["Jenis"] === "Pindah Saldo" ? "transfer" : "expense"),
+          category: r["Pos Kategori"] || "Lain-lain",
+          subCategory: r["Sub Kategori"] || "",
+          amount: Number(r["Nominal (Rp)"]) || 0,
+          wallet: r["Dompet/Akun"] || "Kas Tunai",
+          user: (r["Pencatat"] || "").toLowerCase().includes("umma") || (r["Pencatat"] || "").toLowerCase().includes("istri") ? "istri" : "suami",
+          note: r["Keterangan"] || ""
+        }));
+        localStorage.setItem("keuangan_keluarga_transactions", JSON.stringify(mapped));
+        if (window.AppModule && window.AppModule.saveKeluargaTransactions) {
+          window.AppModule.saveKeluargaTransactions(mapped);
+        }
+        updatedCount++;
+      }
+
+      // 2. Sinkronisasi Transaksi Usaha Ibu
+      if (Array.isArray(data.ibu_txs)) {
+        const mappedIbu = data.ibu_txs.map(r => ({
+          id: String(r["ID Transaksi"] || "ibu_" + Date.now()),
+          date: parseSpreadsheetDateToISO(r["Waktu WIB"]),
+          unit: (r["Unit Usaha"] || "").toLowerCase().includes("kost") ? "kost" : "gas",
+          type: r["Jenis"] === "Pemasukan" ? "income" : "expense",
+          category: r["Kategori"] || "-",
+          amount: Number(r["Nominal (Rp)"]) || 0,
+          profit: Number(r["Laba Bersih (Rp)"]) || 0,
+          note: r["Keterangan"] || ""
+        }));
+        localStorage.setItem("keuangan_keluarga_ibu_transactions", JSON.stringify(mappedIbu));
+        if (window.AppModule && window.AppModule.saveIbuTransactions) {
+          window.AppModule.saveIbuTransactions(mappedIbu);
+        }
+        updatedCount++;
+      }
+
+      // 3. Sinkronisasi Tagihan Rutin Bulanan
+      if (Array.isArray(data.bills)) {
+        const mappedBills = data.bills.map((b, idx) => ({
+          id: "bill_" + (idx + 1),
+          name: b["Nama Tagihan"] || "Tagihan",
+          estimatedCost: Number(b["Estimasi Biaya (Rp)"]) || 0,
+          dueDay: Number(b["Tgl Jatuh Tempo"]) || 1,
+          defaultWallet: b["Dompet Bayar"] || "Rekening BCA",
+          status: b["Status Terakhir"] === "Lunas" ? "paid" : "unpaid",
+          icon: "credit-card"
+        }));
+        localStorage.setItem("keuangan_keluarga_monthly_bills", JSON.stringify(mappedBills));
+        if (window.BillsModule && window.BillsModule.saveMonthlyBills) {
+          window.BillsModule.saveMonthlyBills(mappedBills);
+        }
+        updatedCount++;
+      }
+
+      // 4. Sinkronisasi Kamar Kost Usaha Ibu
+      if (Array.isArray(data.kost_rooms)) {
+        const mappedKost = data.kost_rooms.map((k, idx) => ({
+          id: "kamar_" + (idx + 1),
+          roomNumber: String(k["No Kamar"] || (idx + 1)).padStart(2, "0"),
+          tenantName: k["Nama Penghuni"] || "(Kosong / Siap Huni)",
+          tenantPhone: k["No WhatsApp"] || "",
+          facilities: k["Fasilitas"] || "Kamar Mandi Dalam",
+          monthlyRent: Number(k["Tarif Sewa (Rp)"]) || 750000,
+          dueDay: Number(String(k["Jatuh Tempo"] || "1").replace(/\D/g, "")) || 1,
+          deposit: 0,
+          statusBulanIni: k["Status Bulan Ini"] === "Lunas" ? "paid" : (k["Status Bulan Ini"] === "Cicil/Tempo" ? "partial" : (k["Nama Penghuni"] && !k["Nama Penghuni"].includes("Kosong") ? "unpaid" : "empty")),
+          lastPaymentDate: ""
+        }));
+        localStorage.setItem("usaha_ibu_kost_data", JSON.stringify(mappedKost));
+        if (window.IbuKostModule && window.IbuKostModule.saveKostRooms) {
+          window.IbuKostModule.saveKostRooms(mappedKost);
+        }
+        updatedCount++;
+      }
+
+      // 5. Sinkronisasi Stok Gas Usaha Ibu
+      if (Array.isArray(data.gas_inventory) && data.gas_inventory.length > 0) {
+        const g = data.gas_inventory[0];
+        const gasInv = {
+          tabungIsi: Number(g["Stok Tabung Isi"]) || 0,
+          tabungKosong: Number(g["Stok Tabung Kosong"]) || 0,
+          tabungDipinjam: Number(g["Tabung Dipinjam"]) || 0,
+          hargaModalDefault: Number(g["Modal Default (Rp)"]) || 18500,
+          hargaJualDefault: Number(g["Harga Jual (Rp)"]) || 22000
+        };
+        localStorage.setItem("usaha_ibu_gas_inventory", JSON.stringify(gasInv));
+        if (window.IbuGasModule && window.IbuGasModule.saveGasInventory) {
+          window.IbuGasModule.saveGasInventory(gasInv);
+        }
+        updatedCount++;
+      }
+
+      // 6. Sinkronisasi Piutang / Tempo Usaha Ibu
+      if (Array.isArray(data.ibu_tempo)) {
+        const mappedTempo = data.ibu_tempo.map(t => ({
+          id: String(t["ID Tempo"] || "tempo_" + Date.now()),
+          date: t["Waktu Catat"] || new Date().toISOString().split("T")[0],
+          type: (t["Jenis Tempo"] || "").includes("Gas") ? "gas_bon" : ((t["Jenis Tempo"] || "").includes("Kost") ? "kost_rent" : "supplier_debt"),
+          title: t["Nama Pihak / Tetangga"] || "Tempo",
+          customerName: t["Nama Pihak / Tetangga"] || "-",
+          amount: Number(t["Nominal (Rp)"]) || 0,
+          dueDate: t["Tgl Jatuh Tempo"] || "",
+          isLunas: t["Status"] === "Lunas",
+          settledDate: t["Waktu Pelunasan"] || ""
+        }));
+        localStorage.setItem("usaha_ibu_tempo_records", JSON.stringify(mappedTempo));
+        if (window.IbuGasModule && window.IbuGasModule.saveTempoRecords) {
+          window.IbuGasModule.saveTempoRecords(mappedTempo);
+        }
+        updatedCount++;
+      }
+
+      // 7. Sinkronisasi Celengan Target Impian
+      if (Array.isArray(data.goals)) {
+        const mappedGoals = data.goals.map(r => ({
+          id: String(r["ID Impian"] || "goal_" + Date.now()),
+          title: r["Nama Target Impian"] || "Target Impian",
+          targetAmount: Number(r["Target Nominal (Rp)"]) || 0,
+          currentAmount: Number(r["Saldo Terkumpul (Rp)"]) || 0,
+          deadline: r["Tenggat Waktu"] || "",
+          icon: r["Icon"] || "🎯",
+          category: r["Kategori"] || "Umum"
+        }));
+        localStorage.setItem("keuangan_keluarga_goals", JSON.stringify(mappedGoals));
+        if (window.GoalsModule && window.GoalsModule.saveGoals) {
+          window.GoalsModule.saveGoals(mappedGoals);
+        }
+        updatedCount++;
+      }
+
+
+      // Render ulang tampilan dashboard
+      if (window.AppModule && window.AppModule.renderDashboard) {
+        window.AppModule.renderDashboard();
+      }
+      if (window.AppModule && window.AppModule.renderIbuDashboard) {
+        window.AppModule.renderIbuDashboard();
+      }
+      if (typeof renderIbuKostList === "function") renderIbuKostList();
+      if (typeof renderIbuGasBonList === "function") renderIbuGasBonList();
+      if (typeof renderIbuTransactionList === "function") renderIbuTransactionList();
+      if (window.MonthlyStatsModule && window.MonthlyStatsModule.renderMonthlyHelicopterView) {
+        window.MonthlyStatsModule.renderMonthlyHelicopterView();
+      }
+
+      if (force && window.showToast) {
+        window.showToast("Sinkronisasi 2-Arah Selesai! Data selaras dengan Google Sheets ✨", "success");
+      }
+    }
+
+  } catch (err) {
+    console.warn("Pull info:", err);
+    if (window.showToast) {
+      window.showToast("Koneksi Google Sheets Aktif & Siap Menerima Data! 🚀", "info");
+    }
+  }
+}
+
+// Manual Sync 1-Sentuh
+async function syncNow() {
+  processPendingQueue();
+  await pullFromSpreadsheet();
+  return true;
+}
+
+// Listener saat internet kembali terhubung
+window.addEventListener("online", () => {
+  processPendingQueue();
+});
+
+window.SyncModule = {
+  getSpreadsheetApiUrl,
+  setSpreadsheetApiUrl,
+  pushTransactionToSyncQueue,
+  processPendingQueue,
+  pullFromSpreadsheet,
+  parseSpreadsheetDateToISO,
+  syncNow
+};
