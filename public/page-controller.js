@@ -257,18 +257,18 @@
     }
 
     function resetDefaultPin() {
-      const proceed = () => {
-        if (window.AuthModule) {
-          window.AuthModule.setFamilyPin("2429");
-          clearPinKey();
-          showToast("PIN berhasil direset ke default keluarga: 2429 ✨", "success");
-        }
-      };
-      if (window.confirmCustom) {
-        window.confirmCustom("Kembalikan PIN ke default keluarga (2429)?", proceed);
-      } else if (confirm("Kembalikan PIN ke default keluarga (2429)?")) {
-        proceed();
+      if (window.AuthModule) {
+        window.AuthModule.setFamilyPin("2429");
       }
+      sessionStorage.setItem("family_unlocked_session", "true");
+      localStorage.setItem("family_unlocked_device", "true");
+      if (window.AuthModule && window.AuthModule.verifyPin) {
+        window.AuthModule.verifyPin("2429", true);
+      }
+      const lockScreen = document.getElementById("pinLockScreen");
+      if (lockScreen) lockScreen.classList.add("hidden");
+      clearPinKey();
+      showToast("Aplikasi Terbuka & PIN Direset ke: 2429 ✨", "success");
     }
 
     // Expose PIN & Auth globally to window
