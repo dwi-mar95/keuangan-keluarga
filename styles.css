@@ -186,6 +186,11 @@ body {
   transition: opacity 0.2s ease;
 }
 
+.hidden,
+.modal-backdrop.hidden {
+  display: none !important;
+}
+
 /* Sub-modals yang dibuka dari dalam modal lain (agar selalu tampil paling depan) */
 #categoryManagerModal,
 #walletManagerModal,
