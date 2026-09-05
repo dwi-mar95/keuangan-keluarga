@@ -8,6 +8,9 @@ const {
   title = "Catatan Keuangan Keluarga Baba & Umma + Usaha Ibu",
   description = "Aplikasi Keuangan Keluarga Baba Pangestu & Umma Atin serta Usaha Ibu. Simpel, cepat, cerah, terintegrasi Google Sheets."
 } = Astro.props;
+
+// Build Timestamp Unik: Menjamin browser selalu memuat kode terbaru saat deploy baru tanpa perlu Hard Refresh (F5)
+const buildTime = Date.now();
 ---
 
 <!DOCTYPE html>
@@ -17,9 +20,15 @@ const {
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>{title}</title>
   <meta name="description" content={description}>
+  
+  <!-- Anti-Stale Cache Control: Mencegah browser menyandera halaman lama -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#10b981">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href={`/styles.css?v=${buildTime}`}>
   
   <!-- Tailwind CSS CDN -->
   <script is:inline src="https://cdn.tailwindcss.com"></script>
@@ -34,43 +43,67 @@ const {
   
   <slot />
 
-  <!-- Core Client-Side Logic & Business Modules -->
-  <script is:inline src="/ui-dialog.js"></script>
-  <script is:inline src="/date-helper.js"></script>
-  <script is:inline src="/categories.js"></script>
-  <script is:inline src="/auth.js"></script>
-  <script is:inline src="/settings.js"></script>
-  <script is:inline src="/bills.js"></script>
-  <script is:inline src="/goals.js"></script>
-  <script is:inline src="/education.js"></script>
-  <script is:inline src="/family-parents.js"></script>
-  <script is:inline src="/vehicle-service.js"></script>
-  <script is:inline src="/investments.js"></script>
-  <script is:inline src="/ibu-gas.js"></script>
-  <script is:inline src="/ibu-kost.js"></script>
-  <script is:inline src="/monthly-stats.js"></script>
-  <script is:inline src="/analytics-health.js"></script>
-  <script is:inline src="/sync.js"></script>
-  <script is:inline src="/app.js"></script>
-  <script is:inline src="/whatsapp.js"></script>
-  <script is:inline src="/export-reports.js"></script>
-  <script is:inline src="/ocr.js"></script>
-  <script is:inline src="/shopping-list.js"></script>
-  <script is:inline src="/backup-restore.js"></script>
-  <script is:inline src="/community.js"></script>
-  <script is:inline src="/taxes-holidays.js"></script>
-  <script is:inline src="/kondangan-social.js"></script>
-  <script is:inline src="/emergency-fund.js"></script>
-  <script is:inline src="/page-controller.js"></script>
+  <!-- Core Client-Side Logic & Business Modules (Dengan Version Cache-Buster Otomatis) -->
+  <script is:inline src={`/ui-dialog.js?v=${buildTime}`}></script>
+  <script is:inline src={`/date-helper.js?v=${buildTime}`}></script>
+  <script is:inline src={`/categories.js?v=${buildTime}`}></script>
+  <script is:inline src={`/auth.js?v=${buildTime}`}></script>
+  <script is:inline src={`/settings.js?v=${buildTime}`}></script>
+  <script is:inline src={`/bills.js?v=${buildTime}`}></script>
+  <script is:inline src={`/goals.js?v=${buildTime}`}></script>
+  <script is:inline src={`/education.js?v=${buildTime}`}></script>
+  <script is:inline src={`/family-parents.js?v=${buildTime}`}></script>
+  <script is:inline src={`/vehicle-service.js?v=${buildTime}`}></script>
+  <script is:inline src={`/investments.js?v=${buildTime}`}></script>
+  <script is:inline src={`/ibu-gas.js?v=${buildTime}`}></script>
+  <script is:inline src={`/ibu-kost.js?v=${buildTime}`}></script>
+  <script is:inline src={`/monthly-stats.js?v=${buildTime}`}></script>
+  <script is:inline src={`/analytics-health.js?v=${buildTime}`}></script>
+  <script is:inline src={`/sync.js?v=${buildTime}`}></script>
+  <script is:inline src={`/app.js?v=${buildTime}`}></script>
+  <script is:inline src={`/whatsapp.js?v=${buildTime}`}></script>
+  <script is:inline src={`/export-reports.js?v=${buildTime}`}></script>
+  <script is:inline src={`/ocr.js?v=${buildTime}`}></script>
+  <script is:inline src={`/shopping-list.js?v=${buildTime}`}></script>
+  <script is:inline src={`/backup-restore.js?v=${buildTime}`}></script>
+  <script is:inline src={`/community.js?v=${buildTime}`}></script>
+  <script is:inline src={`/taxes-holidays.js?v=${buildTime}`}></script>
+  <script is:inline src={`/kondangan-social.js?v=${buildTime}`}></script>
+  <script is:inline src={`/emergency-fund.js?v=${buildTime}`}></script>
+  <script is:inline src={`/page-controller.js?v=${buildTime}`}></script>
 
-  <!-- PWA Service Worker Registration -->
-  <script is:inline>
+  <!-- PWA Service Worker Registration: Auto-Update & Auto-Reload Saat Ada Versi Baru -->
+  <script is:inline define:vars={{ buildTime }}>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(reg => {
-          console.log('ServiceWorker registered:', reg.scope);
+        navigator.serviceWorker.register('/sw.js?v=' + buildTime).then(reg => {
+          // Paksa periksa update ke server setiap kali aplikasi dibuka
+          reg.update();
+
+          // Deteksi apakah worker baru sedang diinstall
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                // Jika worker baru telah aktif dan menggantikan versi lama
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  console.log("Pembaruan versi baru terdeteksi! Memuat versi terbaru...");
+                  window.location.reload();
+                }
+              });
+            }
+          });
         }).catch(err => {
           console.log('ServiceWorker error:', err);
+        });
+
+        // Tangani controller change untuk auto-reload instan tanpa F5
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
         });
       });
     }

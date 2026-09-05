@@ -1,5 +1,5 @@
 // Service Worker - Network-First Ultra Sync + Offline Fallback
-const CACHE_NAME = "keuangan-keluarga-v18";
+const CACHE_NAME = "keuangan-keluarga-v19";
 const ASSETS_TO_CACHE = [
   "./",
   "./index.html",
