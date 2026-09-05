@@ -73,35 +73,65 @@
 /**
  * Toast Notification Modern (Menggantikan alert bawaan)
  */
-function showToast(message, type = "success", duration = 3000) {
+let currentToastTimeout = null;
+
+function showToast(message, type = "success", duration = 2200) {
   const container = document.getElementById("toastContainer");
   if (!container) {
     console.log(message);
     return;
   }
 
+  // Jika pesan yang sama persis sedang tampil, jangan duplikasi animasi
+  const activeExisting = container.querySelector(".toast-item");
+  if (activeExisting && activeExisting.dataset.msg === String(message)) {
+    return;
+  }
+
+  // Bersihkan toast sebelumnya agar tidak menumpuk dan macet di layar
+  while (container.firstChild) {
+    container.removeChild(container.firstChild);
+  }
+  if (currentToastTimeout) {
+    clearTimeout(currentToastTimeout);
+    currentToastTimeout = null;
+  }
+
   const toast = document.createElement("div");
-  toast.className = "pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-2xl shadow-xl border text-xs font-bold transition-all duration-300 transform translate-y-2 opacity-0";
+  toast.dataset.msg = String(message);
+  toast.className = "toast-item pointer-events-auto cursor-pointer flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl shadow-xl border text-xs font-bold transition-all duration-300 transform translate-y-2 opacity-0 select-none";
 
   let icon = "✅";
   if (type === "success") {
-    toast.className += " bg-emerald-900/90 text-emerald-100 border-emerald-700/60 backdrop-blur-md";
+    toast.className += " bg-emerald-900/95 text-emerald-100 border-emerald-700/60 backdrop-blur-md";
     icon = "✨";
   } else if (type === "error") {
-    toast.className += " bg-rose-900/90 text-rose-100 border-rose-700/60 backdrop-blur-md";
+    toast.className += " bg-rose-900/95 text-rose-100 border-rose-700/60 backdrop-blur-md";
     icon = "❌";
   } else if (type === "warning") {
-    toast.className += " bg-amber-900/90 text-amber-100 border-amber-700/60 backdrop-blur-md";
+    toast.className += " bg-amber-900/95 text-amber-100 border-amber-700/60 backdrop-blur-md";
     icon = "⚠️";
   } else {
-    toast.className += " bg-slate-900/90 text-slate-100 border-slate-700/60 backdrop-blur-md";
+    toast.className += " bg-slate-900/95 text-slate-100 border-slate-700/60 backdrop-blur-md";
     icon = "ℹ️";
   }
 
   toast.innerHTML = `
-    <span class="text-sm">${icon}</span>
-    <span class="leading-snug">${String(message).replace(/\n/g, "<br>")}</span>
+    <div class="flex items-center gap-2.5">
+      <span class="text-sm shrink-0">${icon}</span>
+      <span class="leading-snug">${String(message).replace(/\n/g, "<br>")}</span>
+    </div>
+    <button type="button" aria-label="Tutup" class="text-white/60 hover:text-white p-0.5 ml-1 text-xs shrink-0">&times;</button>
   `;
+
+  // Klik langsung untuk menutup toast seketika (Tap to Dismiss)
+  const dismiss = () => {
+    toast.classList.add("opacity-0", "-translate-y-2");
+    setTimeout(() => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 200);
+  };
+  toast.onclick = dismiss;
 
   container.appendChild(toast);
 
@@ -109,11 +139,8 @@ function showToast(message, type = "success", duration = 3000) {
     toast.classList.remove("translate-y-2", "opacity-0");
   });
 
-  setTimeout(() => {
-    toast.classList.add("opacity-0", "-translate-y-2");
-    setTimeout(() => {
-      if (toast.parentNode) toast.parentNode.removeChild(toast);
-    }, 300);
+  currentToastTimeout = setTimeout(() => {
+    dismiss();
   }, duration);
 }
 

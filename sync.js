@@ -128,9 +128,9 @@ async function processPendingQueue() {
       console.log("Sync ke Google Spreadsheet berhasil!");
       window.dispatchEvent(new CustomEvent("sync-completed", { detail: { success: true } }));
 
-      // Ambil data terbaru dari server setelah jeda commit agar cache server ter-update presisi
+      // Ambil data terbaru dari server setelah jeda commit secara silent di background tanpa spam toast
       setTimeout(() => {
-        pullFromSpreadsheet(true);
+        pullFromSpreadsheet(false);
       }, 1500);
       return true;
     }
@@ -344,9 +344,6 @@ async function pullFromSpreadsheet(force = false) {
           icon: "credit-card"
         }));
         localStorage.setItem("keuangan_keluarga_monthly_bills", JSON.stringify(mappedBills));
-        if (window.BillsModule && window.BillsModule.saveMonthlyBills) {
-          window.BillsModule.saveMonthlyBills(mappedBills);
-        }
         updatedCount++;
       }
 
@@ -365,9 +362,6 @@ async function pullFromSpreadsheet(force = false) {
           lastPaymentDate: ""
         }));
         localStorage.setItem("usaha_ibu_kost_data", JSON.stringify(mappedKost));
-        if (window.IbuKostModule && window.IbuKostModule.saveKostRooms) {
-          window.IbuKostModule.saveKostRooms(mappedKost);
-        }
         updatedCount++;
       }
 
@@ -382,13 +376,9 @@ async function pullFromSpreadsheet(force = false) {
           hargaJualDefault: Number(g["Harga Jual (Rp)"]) || 22000
         };
         localStorage.setItem("usaha_ibu_gas_inventory", JSON.stringify(gasInv));
-        if (window.IbuGasModule && window.IbuGasModule.saveGasInventory) {
-          window.IbuGasModule.saveGasInventory(gasInv);
-        }
         updatedCount++;
       }
 
-      // 6. Sinkronisasi Piutang / Tempo Usaha Ibu
       // 6. Sinkronisasi Piutang / Tempo Usaha Ibu (Dengan Smart Anti-Revert Merge)
       const tempoData = data.ibu_tempo || data.tempo;
       if (Array.isArray(tempoData)) {
@@ -411,7 +401,7 @@ async function pullFromSpreadsheet(force = false) {
           dueDate: t["Tgl Jatuh Tempo"] || "",
           isLunas: t["Status"] === "Lunas",
           settledDate: t["Waktu Pelunasan"] || ""
-        })).filter(t => !pendingDeletedTempoIds.has(t.id));
+        })).filter(t => !pendingDeletedTempoIds.has(t.id) && !deletedIds.has(t.id));
 
         const finalTempo = mappedTempo.map(remoteItem => {
           if (pendingUpdateTempoIds.has(remoteItem.id)) {
@@ -422,15 +412,12 @@ async function pullFromSpreadsheet(force = false) {
         });
 
         localTempo.forEach(localItem => {
-          if (!pendingDeletedTempoIds.has(localItem.id) && !finalTempo.some(f => f.id === localItem.id)) {
+          if (!pendingDeletedTempoIds.has(localItem.id) && !deletedIds.has(localItem.id) && !finalTempo.some(f => f.id === localItem.id)) {
             finalTempo.unshift(localItem);
           }
         });
 
         localStorage.setItem("usaha_ibu_tempo_records", JSON.stringify(finalTempo));
-        if (window.IbuGasModule && window.IbuGasModule.saveTempoRecords) {
-          window.IbuGasModule.saveTempoRecords(finalTempo);
-        }
         updatedCount++;
       }
 
@@ -446,9 +433,6 @@ async function pullFromSpreadsheet(force = false) {
           category: r["Kategori"] || "Umum"
         }));
         localStorage.setItem("keuangan_keluarga_goals", JSON.stringify(mappedGoals));
-        if (window.GoalsModule && window.GoalsModule.saveGoals) {
-          window.GoalsModule.saveGoals(mappedGoals);
-        }
         updatedCount++;
       }
 
@@ -555,7 +539,7 @@ async function pullFromSpreadsheet(force = false) {
 
   } catch (err) {
     console.warn("Pull info:", err);
-    if (window.showToast) {
+    if (force && window.showToast) {
       window.showToast("Koneksi Google Sheets Aktif & Siap Menerima Data! 🚀", "info");
     }
   }
