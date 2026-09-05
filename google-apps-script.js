@@ -224,12 +224,12 @@ function handleSingleSyncItem(ss, item) {
     for (let r = 1; r < data.length; r++) {
       if (String(data[r][0]) === String(p.id)) {
         sheet.getRange(r + 1, 2).setValue(formattedDateWIB);
-        sheet.getRange(r + 1, 3).setValue(p.type === "income" ? "Pemasukan" : "Pengeluaran");
+        sheet.getRange(r + 1, 3).setValue(p.type === "income" ? "Pemasukan" : (p.type === "transfer" ? "Pindah Saldo" : "Pengeluaran"));
         sheet.getRange(r + 1, 4).setValue(p.category || "-");
         sheet.getRange(r + 1, 5).setValue(p.subCategory || "-");
         sheet.getRange(r + 1, 6).setValue(Number(p.amount) || 0);
         sheet.getRange(r + 1, 7).setValue(p.wallet || "-");
-        sheet.getRange(r + 1, 8).setValue(p.user === "istri" ? "Umma Atin" : "Baba Pangestu");
+        sheet.getRange(r + 1, 8).setValue(p.user === "istri" ? "Umma Atin" : (p.user === "suami" ? "Baba Pangestu" : "Keluarga"));
         sheet.getRange(r + 1, 9).setValue(p.note || "-");
         break;
       }
@@ -512,7 +512,7 @@ function handleSingleSyncItem(ss, item) {
         sPar.appendRow([
           pr.name || "-",
           pr.relation || "Orang Tua",
-          Number(pr.amount) || 1000000,
+          Number(pr.amount || pr.defaultAmount) || 1000000,
           pr.defaultWallet || "Rekening BCA",
           pr.note || "-"
         ]);

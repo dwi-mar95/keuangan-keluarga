@@ -47,18 +47,18 @@ function pushTransactionToSyncQueue(action, payload) {
   }, 250);
 }
 
-// Kirim antrean tertunda ke Google Apps Script (POST - Safe Turbo Engine)
+/// Kirim antrean tertunda ke Google Apps Script (POST - Safe Turbo Engine)
 async function processPendingQueue() {
-  if (isSyncing) return;
+  if (isSyncing) return false;
   const apiUrl = getSpreadsheetApiUrl();
-  if (!apiUrl) return;
+  if (!apiUrl) return false;
 
   const queue = getPendingQueue();
-  if (queue.length === 0) return;
+  if (queue.length === 0) return true;
 
   if (!navigator.onLine) {
     console.log("Offline: sync ditunda hingga terhubung ke internet");
-    return;
+    return false;
   }
 
   isSyncing = true;
@@ -106,13 +106,16 @@ async function processPendingQueue() {
       console.log("Sync ke Google Spreadsheet berhasil!");
       window.dispatchEvent(new CustomEvent("sync-completed", { detail: { success: true } }));
 
-      // Ambil data terbaru dari server setelah commit selesai agar cache server ter-update presisi
+      // Ambil data terbaru dari server setelah jeda commit agar cache server ter-update presisi
       setTimeout(() => {
         pullFromSpreadsheet(true);
-      }, 750);
+      }, 1500);
+      return true;
     }
+    return false;
   } catch (err) {
     console.warn("Gagal mengirim ke Google Spreadsheet, akan dicoba lagi nanti:", err);
+    return false;
   } finally {
     isSyncing = false;
   }
@@ -138,12 +141,11 @@ function parseSpreadsheetDateToISO(raw) {
     if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
       const parts = raw.split(" ");
       const timeStr = parts[1] || "12:00:00";
-      const isoStr = `${parts[0]}T${timeStr}+07:00`;
-      const d = new Date(isoStr);
+      const d = new Date(`${parts[0]}T${timeStr}+07:00`);
       if (!isNaN(d.getTime())) return d.toISOString();
     }
     
-    // 3. Format dengan garis miring (DD/MM/YYYY atau YYYY/MM/DD)
+    // 3. Format DD/MM/YYYY atau YYYY/MM/DD
     if (raw.includes("/")) {
       const parts = raw.split(" ");
       const dateParts = parts[0].split("/");
@@ -201,12 +203,15 @@ async function pullFromSpreadsheet(force = false) {
     if (data && data.status === "success") {
       let updatedCount = 0;
 
-      // 1. Sinkronisasi Transaksi Keluarga (Dengan Smart Merge)
+      // 1. Sinkronisasi Transaksi Keluarga (Dengan Smart Merge Anti-Revert)
       if (Array.isArray(data.keluarga_txs)) {
         const localTxs = (window.AppModule && window.AppModule.getTransactions) ? window.AppModule.getTransactions() : [];
         const pendingQueue = getPendingQueue();
         const pendingKeluargaIds = new Set(
-          pendingQueue.filter(item => item.action && item.action.includes("keluarga_tx") && item.payload && item.payload.id).map(item => item.payload.id)
+          pendingQueue.filter(item => item.action && (item.action.includes("keluarga_tx") || item.action === "add_keluarga_tx" || item.action === "update_keluarga_tx") && item.payload && item.payload.id).map(item => item.payload.id)
+        );
+        const pendingDeletedKeluargaIds = new Set(
+          pendingQueue.filter(item => item.action === "delete_keluarga_tx" && item.payload && item.payload.id).map(item => item.payload.id)
         );
 
         const mapped = data.keluarga_txs.map(r => ({
@@ -219,7 +224,7 @@ async function pullFromSpreadsheet(force = false) {
           wallet: r["Dompet/Akun"] || "Kas Tunai",
           user: (r["Pencatat"] || "").toLowerCase().includes("umma") || (r["Pencatat"] || "").toLowerCase().includes("istri") ? "istri" : "suami",
           note: r["Keterangan"] || ""
-        }));
+        })).filter(r => !pendingDeletedKeluargaIds.has(r.id)); // Jangan bawa kembali transaksi yang baru saja dihapus!
 
         // Pertahankan editan lokal yang masih ada di antrean sync
         const finalKeluarga = mapped.map(remote => {
@@ -229,6 +234,16 @@ async function pullFromSpreadsheet(force = false) {
           }
           return remote;
         });
+
+        // Tambahkan item lokal yang baru dibuat offline dan belum tercatat di spreadsheet
+        localTxs.forEach(localItem => {
+          if (!pendingDeletedKeluargaIds.has(localItem.id) && !finalKeluarga.some(f => f.id === localItem.id)) {
+            finalKeluarga.unshift(localItem);
+          }
+        });
+
+        // Urutkan transaksi berdasarkan tanggal terbaru
+        finalKeluarga.sort((a, b) => new Date(b.date) - new Date(a.date));
 
         localStorage.setItem("keuangan_keluarga_transactions", JSON.stringify(finalKeluarga));
         if (window.AppModule && window.AppModule.saveKeluargaTransactions) {
@@ -242,7 +257,10 @@ async function pullFromSpreadsheet(force = false) {
         const localIbu = (window.AppModule && window.AppModule.getIbuTransactions) ? window.AppModule.getIbuTransactions() : [];
         const pendingQueue = getPendingQueue();
         const pendingIbuIds = new Set(
-          pendingQueue.filter(item => item.action && item.action.includes("ibu_tx") && item.payload && item.payload.id).map(item => item.payload.id)
+          pendingQueue.filter(item => item.action && (item.action.includes("ibu_tx") || item.action === "add_ibu_tx" || item.action === "update_ibu_tx") && item.payload && item.payload.id).map(item => item.payload.id)
+        );
+        const pendingDeletedIbuIds = new Set(
+          pendingQueue.filter(item => item.action === "delete_ibu_tx" && item.payload && item.payload.id).map(item => item.payload.id)
         );
 
         const mappedIbu = data.ibu_txs.map(r => ({
@@ -254,7 +272,7 @@ async function pullFromSpreadsheet(force = false) {
           amount: Number(r["Nominal (Rp)"]) || 0,
           profit: Number(r["Laba Bersih (Rp)"]) || 0,
           note: r["Keterangan"] || ""
-        }));
+        })).filter(r => !pendingDeletedIbuIds.has(r.id)); // Jangan bawa kembali transaksi ibu yang sudah dihapus
 
         // Smart Merge: Jika item baru saja diedit di antrean lokal, JANGAN TIMPA dengan data lama server
         const finalIbu = mappedIbu.map(remoteItem => {
@@ -267,7 +285,7 @@ async function pullFromSpreadsheet(force = false) {
 
         // Tambahkan item lokal yang baru dibuat offline dan belum tercatat di spreadsheet
         localIbu.forEach(localItem => {
-          if (pendingIbuIds.has(localItem.id) && !finalIbu.some(f => f.id === localItem.id)) {
+          if (!pendingDeletedIbuIds.has(localItem.id) && !finalIbu.some(f => f.id === localItem.id)) {
             finalIbu.unshift(localItem);
           }
         });
@@ -339,8 +357,19 @@ async function pullFromSpreadsheet(force = false) {
       }
 
       // 6. Sinkronisasi Piutang / Tempo Usaha Ibu
-      if (Array.isArray(data.ibu_tempo)) {
-        const mappedTempo = data.ibu_tempo.map(t => ({
+      // 6. Sinkronisasi Piutang / Tempo Usaha Ibu (Dengan Smart Anti-Revert Merge)
+      const tempoData = data.ibu_tempo || data.tempo;
+      if (Array.isArray(tempoData)) {
+        const localTempo = (window.IbuGasModule && window.IbuGasModule.getTempoRecords) ? window.IbuGasModule.getTempoRecords() : [];
+        const pendingQueue = getPendingQueue();
+        const pendingDeletedTempoIds = new Set(
+          pendingQueue.filter(item => item.action === "delete_ibu_tempo" && item.payload && item.payload.id).map(item => item.payload.id)
+        );
+        const pendingUpdateTempoIds = new Set(
+          pendingQueue.filter(item => (item.action === "update_ibu_tempo" || item.action === "pay_ibu_tempo") && item.payload && item.payload.id).map(item => item.payload.id)
+        );
+
+        const mappedTempo = tempoData.map(t => ({
           id: String(t["ID Tempo"] || "tempo_" + Date.now()),
           date: t["Waktu Catat"] || new Date().toISOString().split("T")[0],
           type: (t["Jenis Tempo"] || "").includes("Gas") ? "gas_bon" : ((t["Jenis Tempo"] || "").includes("Kost") ? "kost_rent" : "supplier_debt"),
@@ -350,10 +379,25 @@ async function pullFromSpreadsheet(force = false) {
           dueDate: t["Tgl Jatuh Tempo"] || "",
           isLunas: t["Status"] === "Lunas",
           settledDate: t["Waktu Pelunasan"] || ""
-        }));
-        localStorage.setItem("usaha_ibu_tempo_records", JSON.stringify(mappedTempo));
+        })).filter(t => !pendingDeletedTempoIds.has(t.id));
+
+        const finalTempo = mappedTempo.map(remoteItem => {
+          if (pendingUpdateTempoIds.has(remoteItem.id)) {
+            const localMatch = localTempo.find(l => l.id === remoteItem.id);
+            return localMatch || remoteItem;
+          }
+          return remoteItem;
+        });
+
+        localTempo.forEach(localItem => {
+          if (!pendingDeletedTempoIds.has(localItem.id) && !finalTempo.some(f => f.id === localItem.id)) {
+            finalTempo.unshift(localItem);
+          }
+        });
+
+        localStorage.setItem("usaha_ibu_tempo_records", JSON.stringify(finalTempo));
         if (window.IbuGasModule && window.IbuGasModule.saveTempoRecords) {
-          window.IbuGasModule.saveTempoRecords(mappedTempo);
+          window.IbuGasModule.saveTempoRecords(finalTempo);
         }
         updatedCount++;
       }
@@ -412,7 +456,7 @@ async function pullFromSpreadsheet(force = false) {
         updatedCount++;
       }
 
-      // 9. Sinkronisasi Pendidikan Anak & Istri
+      // 9. Sinkronisasi Pendidikan Anak & Istri (Sinkronkan ke kedua storage key)
       if (Array.isArray(data.education) && data.education.length > 0) {
         const mappedEdu = data.education.map((e, idx) => ({
           id: "edu_" + (idx + 1),
@@ -423,20 +467,23 @@ async function pullFromSpreadsheet(force = false) {
           status: e["Status"] === "Aktif" ? "active" : "upcoming"
         }));
         localStorage.setItem("keuangan_keluarga_education_plans", JSON.stringify(mappedEdu));
+        localStorage.setItem("keuangan_keluarga_dynamic_education", JSON.stringify(mappedEdu));
         updatedCount++;
       }
 
-      // 10. Sinkronisasi Bakti Orang Tua & Mertua
+      // 10. Sinkronisasi Bakti Orang Tua & Mertua (Sinkronkan ke kedua storage key)
       if (Array.isArray(data.parents) && data.parents.length > 0) {
         const mappedParents = data.parents.map((p, idx) => ({
           id: "par_" + (idx + 1),
           name: p["Nama Penerima"] || "Orang Tua",
           relation: p["Hubungan"] || "Orang Tua",
           amount: Number(p["Nominal Rutin (Rp)"]) || 1000000,
+          defaultAmount: Number(p["Nominal Rutin (Rp)"]) || 1000000,
           defaultWallet: p["Dompet Penyalur"] || "Rekening BCA",
           note: p["Keterangan"] || ""
         }));
         localStorage.setItem("keuangan_keluarga_parents", JSON.stringify(mappedParents));
+        localStorage.setItem("keuangan_keluarga_parents_recipients", JSON.stringify(mappedParents));
         updatedCount++;
       }
 
@@ -484,8 +531,10 @@ async function pullFromSpreadsheet(force = false) {
 
 // Manual Sync 1-Sentuh
 async function syncNow() {
-  processPendingQueue();
-  await pullFromSpreadsheet();
+  if (window.showToast) window.showToast("Mengirim antrean ke Google Sheets... ⏳", "info");
+  await processPendingQueue();
+  await new Promise(r => setTimeout(r, 1200));
+  await pullFromSpreadsheet(true);
   return true;
 }
 

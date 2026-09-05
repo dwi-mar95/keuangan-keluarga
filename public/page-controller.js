@@ -720,10 +720,12 @@
     }
 
     
-    function handleManualSyncGoogleSheets() {
-      if (window.SyncModule) {
-        window.SyncModule.processPendingQueue();
-        window.SyncModule.pullFromSpreadsheet();
+    async function handleManualSyncGoogleSheets() {
+      if (window.SyncModule && window.SyncModule.syncNow) {
+        await window.SyncModule.syncNow();
+      } else if (window.SyncModule) {
+        await window.SyncModule.processPendingQueue();
+        await window.SyncModule.pullFromSpreadsheet(true);
       }
     }
   
@@ -1311,6 +1313,10 @@
 
     function saveDynamicEducationItems(items) {
       localStorage.setItem(EDU_STORAGE_KEY, JSON.stringify(items));
+      localStorage.setItem("keuangan_keluarga_education_plans", JSON.stringify(items));
+      if (window.SyncModule && window.SyncModule.pushTransactionToSyncQueue) {
+        window.SyncModule.pushTransactionToSyncQueue("sync_education", { plans: items });
+      }
     }
 
     function handleAddNewEduSubmit() {
@@ -1937,6 +1943,10 @@
 
     function saveDynamicParentsRecipients(list) {
       localStorage.setItem(PARENTS_RECIPIENTS_KEY, JSON.stringify(list));
+      localStorage.setItem("keuangan_keluarga_parents", JSON.stringify(list));
+      if (window.SyncModule && window.SyncModule.pushTransactionToSyncQueue) {
+        window.SyncModule.pushTransactionToSyncQueue("sync_parents", { recipients: list });
+      }
     }
 
     async function handleAddNewParentRecipientPrompt() {
@@ -3744,27 +3754,62 @@
       setPinLockEnabled,
       copyWifePairingLink,
       resetDefaultPin,
+      handlePinToggleChange,
+      handleSaveNewPin,
       openQuickAddModal,
       closeQuickAddModal,
+      pressNumpad,
+      clearCalcAndNumpad,
+      submitQuickAddTransaction,
+      selectPresetIcon,
       openTransferModal,
       closeTransferModal,
+      handleExecuteTransferSubmit,
       openWalletManagerModal,
       closeWalletManagerModal,
+      handleAddNewWalletSubmit,
+      handleEditWalletBalancePrompt,
+      handleDeleteWalletSubmit,
       openPresetsManagerModal,
       closePresetsManagerModal,
+      handleAddNewPresetSubmit,
+      handleEditDynamicPreset,
       openManageFeaturesModal,
       closeManageFeaturesModal,
+      resetFeatureShortcutsToDefault,
+      handleAddNewFeatureShortcutSubmit,
+      handleFeatureShortcutClick,
+      handleEditFeatureShortcut,
+      handleDeleteFeatureShortcut,
       openSettingsModal,
       closeSettingsModal,
+      saveAllSettings,
+      handleResetAllDataToZero,
+      handleForceCloudSync,
+      openCategoryManagerModal,
+      closeCategoryManagerModal,
+      setCatManagerTab,
+      resetCategoriesDefaultPrompt,
+      handleAddNewCategorySubmit,
+      handleEditCategoryItem,
+      handleDeleteCategoryItem,
       openEditModal,
       closeEditModal,
       submitEditTransaction,
+      handleDeleteTx,
       openEditIbuModal,
       closeEditIbuModal,
       submitEditIbuTransaction,
+      handleDeleteIbuTx,
       handleEditTempoPrompt,
+      openPayTempoModal,
+      closePayTempoModal,
+      submitPayTempo,
+      handleDeleteTempo,
       handleEditGoldPrompt,
       handleEditFundPrompt,
+      handleAddNewGoldPrompt,
+      handleAddNewFundPrompt,
       openTabModal,
       closeTabModal,
       switchLedger,
@@ -3776,16 +3821,34 @@
       handleTogglePrivacy,
       openIbuSettingsModal,
       closeIbuSettingsModal,
+      saveIbuSettings,
+      handleResetIbuDataToZero,
+      markAllKostUnpaid,
       openNewIbuTxModal,
       closeNewIbuTxModal,
+      closeIbuTxModal,
+      handleIbuTypeChange,
+      submitIbuTransaction,
       openIbuSocialModal,
       closeIbuSocialModal,
       toggleSocialGiftType,
       submitIbuSocialGift,
       openKostRoomEditModal,
       closeKostRoomEditModal,
+      submitSaveKostRoom,
+      handleDeleteKostRoom,
+      openKostPaymentModal,
+      closeKostPaymentModal,
+      handleKostPayDateChange,
+      selectKostDuration,
+      handleKostPayAmountChange,
+      setKostPayMode,
+      submitKostPayment,
       openGasQuickModal,
       closeGasQuickModal,
+      updateGasQuickTotal,
+      setGasSaleType,
+      submitGasQuickTransaction,
       openNewTempoPrompt,
       renderIbuKostList,
       renderIbuGasBonList,
@@ -3795,5 +3858,35 @@
       resetAllFilters,
       setTheme,
       setLogoIcon,
-      handleRestoreFileChange
+      handleRestoreFileChange,
+      handleVoiceInputClick,
+      stopVoiceListening,
+      handleOcrFileChange,
+      handleAddNewBillSubmit,
+      handleEditBill,
+      handleDeleteBill,
+      handleAddNewShoppingSubmit,
+      handleEditShoppingItem,
+      handleAddNewParentRecipientPrompt,
+      executeParentGift,
+      handleEditParentRecipient,
+      deleteDynamicParentRecipient,
+      handleAddNewEduSubmit,
+      payEduBillPrompt,
+      handleEditEdu,
+      deleteDynamicEdu,
+      handleAddNewTaxSubmit,
+      payTaxPrompt,
+      handleEditTax,
+      deleteDynamicTax,
+      handleAddNewVehicleSubmit,
+      handleEditVehicle,
+      handleDeleteVehicle,
+      recordVehicleServicePrompt,
+      handleAddNewGoalSubmit,
+      handleEditGoalPrompt,
+      handleDeleteGoal,
+      handleDepositGoalPrompt,
+      handleWithdrawGoalPrompt,
+      handleRecordZakatExpense
     });
