@@ -282,6 +282,26 @@ function handleSingleSyncItem(ss, item) {
     }
   }
 
+  // 5c. UPDATE TRANSAKSI USAHA IBU (CRUD EDIT)
+  else if (action === "update_ibu_tx") {
+    const sheet = getSheetSafe(ss, "Usaha_Ibu_Transaksi");
+    if (sheet) {
+      const data = sheet.getDataRange().getValues();
+      for (let r = 1; r < data.length; r++) {
+        if (String(data[r][0]) === String(p.id)) {
+          sheet.getRange(r + 1, 2).setValue(formattedDateWIB);
+          sheet.getRange(r + 1, 3).setValue(p.unit === "kost" ? "Kost-Kostan" : "Gas LPG Eceran");
+          sheet.getRange(r + 1, 4).setValue(p.type === "income" ? "Pemasukan" : "Pengeluaran");
+          sheet.getRange(r + 1, 5).setValue(p.category || "-");
+          sheet.getRange(r + 1, 6).setValue(Number(p.amount) || 0);
+          sheet.getRange(r + 1, 7).setValue(Number(p.profit) || 0);
+          sheet.getRange(r + 1, 8).setValue(p.note || "-");
+          break;
+        }
+      }
+    }
+  }
+
   // 6. TRANSAKSI TEMPO & BON USAHA IBU
   else if (action === "add_ibu_tempo") {
     const sheet = getSheetSafe(ss, "Usaha_Ibu_Tempo");

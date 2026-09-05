@@ -43,6 +43,17 @@ function deleteGoldItem(id) {
   saveInvestmentsData(data);
 }
 
+function updateGoldItem(id, updated) {
+  const data = getInvestmentsData();
+  const idx = data.gold.findIndex(x => x.id === id);
+  if (idx !== -1) {
+    data.gold[idx] = { ...data.gold[idx], ...updated };
+    saveInvestmentsData(data);
+    return data.gold[idx];
+  }
+  return null;
+}
+
 function addFundItem(name, capital, currentValue) {
   const data = getInvestmentsData();
   data.mutualFunds.push({
@@ -58,6 +69,17 @@ function deleteFundItem(id) {
   const data = getInvestmentsData();
   data.mutualFunds = data.mutualFunds.filter(x => x.id !== id);
   saveInvestmentsData(data);
+}
+
+function updateFundItem(id, updated) {
+  const data = getInvestmentsData();
+  const idx = data.mutualFunds.findIndex(x => x.id === id);
+  if (idx !== -1) {
+    data.mutualFunds[idx] = { ...data.mutualFunds[idx], ...updated };
+    saveInvestmentsData(data);
+    return data.mutualFunds[idx];
+  }
+  return null;
 }
 
 function calculateFamilyNetWorth(liquidCash = 0, emergencyFund = 0) {
@@ -89,8 +111,10 @@ window.InvestmentsModule = {
   getInvestmentsData,
   saveInvestmentsData,
   addGoldItem,
+  updateGoldItem,
   deleteGoldItem,
   addFundItem,
+  updateFundItem,
   deleteFundItem,
   calculateFamilyNetWorth
 };

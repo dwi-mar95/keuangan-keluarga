@@ -132,6 +132,32 @@ function deleteIbuTransaction(id) {
   return true;
 }
 
+// Update Transaksi Usaha Ibu (Edit / CRUD Update & Backdate Support)
+function updateIbuTransaction(id, updatedData) {
+  let txs = getIbuTransactions();
+  const index = txs.findIndex(t => t.id === id);
+  if (index === -1) return false;
+
+  txs[index] = {
+    ...txs[index],
+    ...updatedData
+  };
+
+  // Urutkan berdasarkan tanggal terbaru
+  txs.sort((a, b) => new Date(b.date) - new Date(a.date));
+  saveIbuTransactions(txs);
+
+  if (window.SyncModule && window.SyncModule.pushTransactionToSyncQueue) {
+    window.SyncModule.pushTransactionToSyncQueue("update_ibu_tx", txs[index]);
+  }
+
+  renderIbuDashboard();
+  if (typeof renderIbuTransactionList === "function") {
+    renderIbuTransactionList();
+  }
+  return txs[index];
+}
+
 // Hitung metrik keuangan keluarga sesuai filter aktif
 function calculateKeluargaMetrics() {
   const allTxs = getKeluargaTransactions();
@@ -872,6 +898,7 @@ window.AppModule = {
   updateTransaction,
   deleteTransaction,
   addIbuTransaction,
+  updateIbuTransaction,
   deleteIbuTransaction,
   calculateKeluargaMetrics,
   getFilteredTransactions,

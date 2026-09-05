@@ -869,7 +869,7 @@
     }
 
     
-    // CRUD: Edit Modal Functions
+    // CRUD: Edit Modal Functions (Keluarga)
     function openEditModal(txId) {
       const txs = window.AppModule.getKeluargaTransactions();
       const tx = txs.find(t => t.id === txId);
@@ -877,6 +877,9 @@
 
       document.getElementById("editTxId").value = tx.id;
       document.getElementById("editTxDate").value = tx.date ? tx.date.split("T")[0] : window.DateHelper.getTodayWIBString();
+      if (document.getElementById("editTxType")) {
+        document.getElementById("editTxType").value = tx.type || "expense";
+      }
       document.getElementById("editTxAmount").value = tx.amount;
       document.getElementById("editTxCategory").value = tx.category + (tx.subCategory ? " - " + tx.subCategory : "");
       document.getElementById("editTxWallet").value = tx.wallet || "Kas Tunai Suami";
@@ -893,6 +896,7 @@
     function submitEditTransaction() {
       const id = document.getElementById("editTxId").value;
       const dateVal = document.getElementById("editTxDate").value;
+      const txType = document.getElementById("editTxType") ? document.getElementById("editTxType").value : "expense";
       const amount = Number(document.getElementById("editTxAmount").value);
       const catFull = document.getElementById("editTxCategory").value;
       const [category, subCategory] = catFull.includes(" - ") ? catFull.split(" - ") : [catFull, ""];
@@ -901,12 +905,13 @@
       const note = document.getElementById("editTxNote").value;
 
       if (!amount || amount <= 0) {
-        alert("Nominal transaksi harus lebih dari 0!");
+        showToast("Nominal transaksi harus lebih dari 0!", "warning");
         return;
       }
 
       window.AppModule.updateTransaction(id, {
         date: dateVal ? dateVal + "T12:00:00+07:00" : new Date().toISOString(),
+        type: txType,
         amount,
         category,
         subCategory: subCategory || category,
@@ -916,7 +921,58 @@
       });
 
       closeEditModal();
-      alert("Perubahan transaksi berhasil disimpan!");
+      showToast("Perubahan transaksi keluarga berhasil disimpan & disinkronkan! ✨", "success");
+    }
+
+    // CRUD: Edit Modal Functions (Usaha Ibu)
+    function openEditIbuModal(txId) {
+      const txs = window.AppModule.getIbuTransactions();
+      const tx = txs.find(t => t.id === txId);
+      if (!tx) return;
+
+      document.getElementById("editIbuTxId").value = tx.id;
+      document.getElementById("editIbuTxDate").value = tx.date ? tx.date.split("T")[0] : window.DateHelper.getTodayWIBString();
+      document.getElementById("editIbuTxUnit").value = tx.unit || "kost";
+      document.getElementById("editIbuTxType").value = tx.type || "income";
+      document.getElementById("editIbuTxCategory").value = tx.category || "";
+      document.getElementById("editIbuTxAmount").value = tx.amount || 0;
+      document.getElementById("editIbuTxProfit").value = tx.profit || 0;
+      document.getElementById("editIbuTxNote").value = tx.note || "";
+
+      document.getElementById("editIbuTxModal").classList.remove("hidden");
+    }
+
+    function closeEditIbuModal() {
+      document.getElementById("editIbuTxModal").classList.add("hidden");
+    }
+
+    function submitEditIbuTransaction() {
+      const id = document.getElementById("editIbuTxId").value;
+      const dateVal = document.getElementById("editIbuTxDate").value;
+      const unit = document.getElementById("editIbuTxUnit").value;
+      const type = document.getElementById("editIbuTxType").value;
+      const category = document.getElementById("editIbuTxCategory").value.trim();
+      const amount = Number(document.getElementById("editIbuTxAmount").value);
+      const profit = Number(document.getElementById("editIbuTxProfit").value) || 0;
+      const note = document.getElementById("editIbuTxNote").value.trim();
+
+      if (!amount || amount <= 0) {
+        showToast("Nominal transaksi harus lebih dari 0!", "warning");
+        return;
+      }
+
+      window.AppModule.updateIbuTransaction(id, {
+        date: dateVal ? dateVal + "T12:00:00+07:00" : new Date().toISOString(),
+        unit,
+        type,
+        category: category || (unit === "kost" ? "Sewa Kost" : "Gas LPG"),
+        amount,
+        profit,
+        note
+      });
+
+      closeEditIbuModal();
+      showToast("Perubahan transaksi usaha ibu berhasil disimpan & disinkronkan! ✨", "success");
     }
 
     // CRUD: Delete Transaction
@@ -1308,6 +1364,47 @@
       window.InvestmentsModule.addFundItem(name, cap, curr);
       openTabModal("investments");
       showToast(`Investasi ${name} berhasil disimpan! ✨`, "success");
+    }
+
+    async function handleEditGoldPrompt(goldId) {
+      const invData = window.InvestmentsModule.getInvestmentsData();
+      const item = invData.gold.find(g => g.id === goldId);
+      if (!item) return;
+
+      const brand = await showPrompt("Edit Emas", "Merk / Brand:", item.brand || "Antam");
+      if (!brand) return;
+      const grams = await showPrompt("Edit Berat Emas", "Berat dalam Gram:", String(item.grams));
+      if (!grams || Number(grams) <= 0) return;
+      const buyPrice = await showPrompt("Edit Harga Beli", "Harga beli per gram (Rp):", String(item.buyPricePerGram));
+      const currPrice = await showPrompt("Edit Harga Pasar Saat Ini", "Harga pasar per gram (Rp):", String(item.currentPricePerGram));
+
+      window.InvestmentsModule.updateGoldItem(goldId, {
+        brand: brand.trim(),
+        grams: Number(grams),
+        buyPricePerGram: Number(buyPrice) || item.buyPricePerGram,
+        currentPricePerGram: Number(currPrice) || item.currentPricePerGram
+      });
+      openTabModal("investments");
+      showToast(`Data emas ${brand} diperbarui! ✨`, "success");
+    }
+
+    async function handleEditFundPrompt(fundId) {
+      const invData = window.InvestmentsModule.getInvestmentsData();
+      const item = invData.mutualFunds.find(mf => mf.id === fundId);
+      if (!item) return;
+
+      const name = await showPrompt("Edit Reksa Dana", "Nama Produk:", item.name);
+      if (!name) return;
+      const cap = await showPrompt("Edit Modal Disetor", "Modal disetor (Rp):", String(item.capital));
+      const curr = await showPrompt("Edit Nilai Saat Ini", "Nilai saat ini (Rp):", String(item.currentValue));
+
+      window.InvestmentsModule.updateFundItem(fundId, {
+        name: name.trim(),
+        capital: Number(cap) || item.capital,
+        currentValue: Number(curr) || item.currentValue
+      });
+      openTabModal("investments");
+      showToast(`Data investasi ${name} diperbarui! ✨`, "success");
     }
 
     // DYNAMIC WALLETS HANDLERS
@@ -2096,7 +2193,8 @@
                   </div>
                   <div class="flex items-center gap-1">
                     <span class="font-extrabold text-amber-900">${window.DateHelper.formatRupiah(g.grams * g.currentPricePerGram)}</span>
-                    <button onclick="window.InvestmentsModule.deleteGoldItem('${g.id}'); openTabModal('investments');" class="text-slate-300 hover:text-rose-500 text-xs p-1">🗑️</button>
+                    <button onclick="handleEditGoldPrompt('${g.id}')" class="text-slate-400 hover:text-amber-700 text-xs p-1 cursor-pointer" title="Edit Emas">✏️</button>
+                    <button onclick="window.InvestmentsModule.deleteGoldItem('${g.id}'); openTabModal('investments');" class="text-slate-300 hover:text-rose-500 text-xs p-1 cursor-pointer" title="Hapus">🗑️</button>
                   </div>
                 </div>
               `).join("")}
@@ -2118,7 +2216,8 @@
                   </div>
                   <div class="flex items-center gap-1">
                     <span class="font-extrabold text-blue-900">${window.DateHelper.formatRupiah(mf.currentValue)}</span>
-                    <button onclick="window.InvestmentsModule.deleteFundItem('${mf.id}'); openTabModal('investments');" class="text-slate-300 hover:text-rose-500 text-xs p-1">🗑️</button>
+                    <button onclick="handleEditFundPrompt('${mf.id}')" class="text-slate-400 hover:text-blue-700 text-xs p-1 cursor-pointer" title="Edit Reksa Dana">✏️</button>
+                    <button onclick="window.InvestmentsModule.deleteFundItem('${mf.id}'); openTabModal('investments');" class="text-slate-300 hover:text-rose-500 text-xs p-1 cursor-pointer" title="Hapus">🗑️</button>
                   </div>
                 </div>
               `).join("")}
@@ -3008,11 +3107,33 @@
                   Lunasi
                 </button>
               `}
+              <button onclick="handleEditTempoPrompt('${b.id}')" class="text-slate-400 hover:text-blue-600 text-xs p-1 cursor-pointer transition-colors" title="Edit Catatan Tempo">✏️</button>
               <button onclick="handleDeleteTempo('${b.id}')" class="text-slate-300 hover:text-rose-500 text-xs p-1 cursor-pointer" title="Hapus Catatan">🗑️</button>
             </div>
           </div>
         `;
       }).join("");
+    }
+
+    async function handleEditTempoPrompt(tempoId) {
+      const records = window.IbuGasModule.getTempoRecords();
+      const item = records.find(r => r.id === tempoId);
+      if (!item) return;
+
+      const newName = await showPrompt("Edit Nama Pihak / Pelanggan", "Nama:", item.customerName || item.title);
+      if (!newName) return;
+      const newAmt = await showPrompt("Edit Nominal Tempo (Rp)", "Nominal:", String(item.amount));
+      if (!newAmt || Number(newAmt) <= 0) return;
+      const newDate = await showPrompt("Edit Tanggal Jatuh Tempo", "Format: YYYY-MM-DD:", item.dueDate || "");
+
+      item.customerName = newName.trim();
+      item.title = `Bon / Tempo (${newName.trim()})`;
+      item.amount = Number(newAmt);
+      item.dueDate = newDate ? newDate.trim() : "";
+
+      window.IbuGasModule.saveTempoRecords(records);
+      renderIbuGasBonList();
+      showToast(`Catatan tempo untuk ${newName} berhasil diperbarui! ✨`, "success");
     }
 
     // Modal Pelunasan Tempo (Backdate)
@@ -3139,6 +3260,9 @@
                 </div>
                 ${t.profit && t.profit > 0 ? `<div class="text-[9.5px] text-amber-600 font-bold">Laba: +${window.DateHelper.formatRupiah(t.profit)}</div>` : ''}
               </div>
+              <button onclick="openEditIbuModal('${t.id}')" class="text-slate-400 hover:text-blue-600 text-xs p-1 cursor-pointer transition-colors" title="Edit Transaksi Usaha Ibu">
+                ✏️
+              </button>
               <button onclick="handleDeleteIbuTx('${t.id}')" class="text-slate-300 hover:text-rose-500 text-xs p-1 cursor-pointer transition-colors" title="Hapus Riwayat">
                 🗑️
               </button>
@@ -3487,6 +3611,15 @@
       closeManageFeaturesModal,
       openSettingsModal,
       closeSettingsModal,
+      openEditModal,
+      closeEditModal,
+      submitEditTransaction,
+      openEditIbuModal,
+      closeEditIbuModal,
+      submitEditIbuTransaction,
+      handleEditTempoPrompt,
+      handleEditGoldPrompt,
+      handleEditFundPrompt,
       openTabModal,
       closeTabModal,
       switchLedger,
