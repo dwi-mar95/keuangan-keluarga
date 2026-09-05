@@ -147,24 +147,29 @@ async function processPendingQueue() {
 let lastPullTime = 0;
 const MIN_PULL_INTERVAL = 30000; // 30 detik interval minimal auto-pull di background
 
-// Helper: Parsing tanggal dari Google Spreadsheet agar tanggal riil transaksi masa lalu tetap utuh presisi
+// Helper: Parsing tanggal dari Google Spreadsheet agar tanggal riil transaksi masa lalu tetap utuh presisi dalam WIB (UTC+7)
 function parseSpreadsheetDateToISO(raw) {
   if (!raw) return new Date().toISOString();
   
   if (typeof raw === "string") {
     raw = raw.trim();
-    // 1. Format ISO dengan T (misal: 2026-09-04T12:00:00+07:00 atau 2026-09-04T05:00:00.000Z)
+    // 1. Format ISO dengan T (misal: 2026-09-04T12:00:00+07:00)
     if (raw.includes("T")) {
+      if (raw.includes("+07:00")) return raw;
       const d = new Date(raw);
-      if (!isNaN(d.getTime())) return d.toISOString();
+      if (!isNaN(d.getTime())) {
+        // Konversi aman ke ISO string
+        return d.toISOString();
+      }
     }
     
-    // 2. Format YYYY-MM-DD HH:mm:ss atau YYYY-MM-DD
+    // 2. Format YYYY-MM-DD HH:mm:ss atau YYYY-MM-DD (Standar Google Sheets WIB)
     if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
       const parts = raw.split(" ");
+      const datePart = parts[0];
       const timeStr = parts[1] || "12:00:00";
-      const d = new Date(`${parts[0]}T${timeStr}+07:00`);
-      if (!isNaN(d.getTime())) return d.toISOString();
+      // Pertahankan tanggal persis dalam zona WIB (+07:00)
+      return `${datePart}T${timeStr}+07:00`;
     }
     
     // 3. Format DD/MM/YYYY atau YYYY/MM/DD
@@ -176,14 +181,10 @@ function parseSpreadsheetDateToISO(raw) {
       if (dateParts.length === 3) {
         if (dateParts[0].length === 4) {
           // YYYY/MM/DD
-          const isoStr = `${dateParts[0]}-${dateParts[1].padStart(2, "0")}-${dateParts[2].padStart(2, "0")}T${timeStr}+07:00`;
-          const d = new Date(isoStr);
-          if (!isNaN(d.getTime())) return d.toISOString();
+          return `${dateParts[0]}-${dateParts[1].padStart(2, "0")}-${dateParts[2].padStart(2, "0")}T${timeStr}+07:00`;
         } else if (dateParts[2].length === 4) {
           // DD/MM/YYYY baku Indonesia
-          const isoStr = `${dateParts[2]}-${dateParts[1].padStart(2, "0")}-${dateParts[0].padStart(2, "0")}T${timeStr}+07:00`;
-          const d = new Date(isoStr);
-          if (!isNaN(d.getTime())) return d.toISOString();
+          return `${dateParts[2]}-${dateParts[1].padStart(2, "0")}-${dateParts[0].padStart(2, "0")}T${timeStr}+07:00`;
         }
       }
     }
@@ -225,6 +226,14 @@ async function pullFromSpreadsheet(force = false) {
     if (data && data.status === "success") {
       let updatedCount = 0;
       const deletedIds = getDeletedIds();
+
+      // 0. Sinkronisasi Kategori Kustom Keluarga (Multi-Device Sync)
+      if (data.custom_categories && window.CategoriesModule && window.CategoriesModule.applyRemoteCategories) {
+        const applied = window.CategoriesModule.applyRemoteCategories(data.custom_categories);
+        if (applied && typeof populateCategorySelect === "function") {
+          populateCategorySelect();
+        }
+      }
 
       // 1. Sinkronisasi Transaksi Keluarga (Dengan Smart Merge Anti-Revert)
       if (Array.isArray(data.keluarga_txs)) {
@@ -293,7 +302,7 @@ async function pullFromSpreadsheet(force = false) {
         const mappedIbu = data.ibu_txs.map(r => ({
           id: String(r["ID Transaksi"] || "ibu_" + Date.now()),
           date: parseSpreadsheetDateToISO(r["Waktu WIB"]),
-          unit: (r["Unit Usaha"] || "").toLowerCase().includes("kost") ? "kost" : "gas",
+          unit: (r["Unit Usaha"] || "").toLowerCase().includes("kost") ? "kost" : (((r["Unit Usaha"] || "").toLowerCase().includes("sedekah") || (r["Unit Usaha"] || "").toLowerCase().includes("berbagi")) ? "social" : "gas"),
           type: r["Jenis"] === "Pemasukan" ? "income" : "expense",
           category: r["Kategori"] || "-",
           amount: Number(r["Nominal (Rp)"]) || 0,

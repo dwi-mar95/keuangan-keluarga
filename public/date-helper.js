@@ -56,6 +56,56 @@ function formatDateTimeIndonesia(dateInput) {
   return `${hari}, ${tgl} ${bln} ${thn} - ${jam}:${menit} WIB`;
 }
 
+// Format aman untuk <input type="date"> (YYYY-MM-DD) dalam zona waktu WIB (UTC+7)
+function toInputDateFormat(dateInput) {
+  if (!dateInput) return getTodayWIBString();
+  
+  if (typeof dateInput === "string") {
+    const s = dateInput.trim();
+    // Jika format sudah diawali YYYY-MM-DD
+    const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+    }
+    // Jika format DD/MM/YYYY
+    const slashMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (slashMatch) {
+      return `${slashMatch[3]}-${slashMatch[2].padStart(2, "0")}-${slashMatch[1].padStart(2, "0")}`;
+    }
+  }
+
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return getTodayWIBString();
+  // Konversi ke WIB UTC+7
+  const utcOffset = d.getTime() + (d.getTimezoneOffset() * 60000);
+  const wibTime = new Date(utcOffset + (7 * 3600000));
+  const year = wibTime.getFullYear();
+  const month = String(wibTime.getMonth() + 1).padStart(2, "0");
+  const day = String(wibTime.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+// Format rapi untuk kartu riwayat transaksi (misal: Senin, 31 Agustus 2026 • 19:22 WIB)
+function formatDateTimeCard(dateInput) {
+  if (!dateInput) return "-";
+  
+  // Deteksi jam dan menit jika ada
+  let timeStr = "";
+  if (typeof dateInput === "string") {
+    const s = dateInput.trim();
+    const timeMatch = s.match(/[T\s](\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (timeMatch) {
+      timeStr = `${timeMatch[1]}:${timeMatch[2]} WIB`;
+    }
+  }
+  
+  const dateOnlyStr = formatDateIndonesia(dateInput);
+  if (timeStr) {
+    return `${dateOnlyStr} • ${timeStr}`;
+  }
+  return dateOnlyStr;
+}
+
 // Format nominal Rupiah rapi (Mendukung Privacy Mode Sensor Angka)
 function formatRupiah(amount, ignorePrivacy = false) {
   if (!ignorePrivacy && window.AuthModule && typeof window.AuthModule.isPrivacyMode === "function" && window.AuthModule.isPrivacyMode()) {
@@ -70,7 +120,9 @@ window.DateHelper = {
   NAMA_BULAN,
   getNowWIB,
   getTodayWIBString,
+  toInputDateFormat,
   formatDateIndonesia,
   formatDateTimeIndonesia,
+  formatDateTimeCard,
   formatRupiah
 };

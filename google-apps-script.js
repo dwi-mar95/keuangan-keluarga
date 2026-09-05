@@ -87,10 +87,18 @@ function doGet(e) {
     _activeSheetCache = {}; // Reset cache memory request baru
 
     if (action === "fetch_all") {
+      // Ambil kustomisasi kategori keluarga dari ScriptProperties (Cloud Storage instan tanpa sheet ke-12)
+      let customCategories = null;
+      try {
+        const catRaw = PropertiesService.getScriptProperties().getProperty("CUSTOM_CATEGORIES_JSON");
+        if (catRaw) customCategories = JSON.parse(catRaw);
+      } catch (e) { }
+
       const payload = {
         status: "success",
         cached: false,
         timestamp: Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd HH:mm:ss"),
+        custom_categories: customCategories,
         keluarga_txs: getSheetDataAsJson(getSheetSafe(ss, "Keluarga_Transaksi")),
         ibu_txs: getSheetDataAsJson(getSheetSafe(ss, "Usaha_Ibu_Transaksi")),
         bills: getSheetDataAsJson(getSheetSafe(ss, "Tagihan_Rutin_Bulanan")),
@@ -197,7 +205,20 @@ function handleSingleSyncItem(ss, item) {
   const p = item.payload;
   if (!p) return;
 
-  const tglObj = new Date(p.date || item.timestamp || new Date());
+  // Parsing tanggal presisi WIB (Mendukung format ISO T, space-separated, dan backdate)
+  let tglObj;
+  if (p.date) {
+    if (typeof p.date === "string" && p.date.includes(" ") && !p.date.includes("T")) {
+      const parts = p.date.trim().split(" ");
+      tglObj = new Date(`${parts[0]}T${parts[1] || '12:00:00'}+07:00`);
+    } else {
+      tglObj = new Date(p.date);
+    }
+  } else {
+    tglObj = new Date(item.timestamp || new Date());
+  }
+  if (isNaN(tglObj.getTime())) tglObj = new Date();
+
   // Gunakan format standar universal yyyy-MM-dd HH:mm:ss agar TIDAK PERNAH tertukar tanggal & bulan di locale spreadsheet manapun
   const formattedDateWIB = Utilities.formatDate(tglObj, "Asia/Jakarta", "yyyy-MM-dd HH:mm:ss");
 
@@ -267,10 +288,12 @@ function handleSingleSyncItem(ss, item) {
   // 5. TRANSAKSI USAHA IBU
   else if (action === "add_ibu_tx") {
     const sheet = getSheetSafe(ss, "Usaha_Ibu_Transaksi");
+    const isSocialUnit = p.unit === "social" || (p.category && (p.category.indexOf("Sedekah") !== -1 || p.category.indexOf("Berbagi") !== -1));
+    const unitLabel = p.unit === "kost" ? "Kost-Kostan" : (isSocialUnit ? "Sedekah / Berbagi" : "Gas LPG Eceran");
     sheet.appendRow([
       p.id,
       formattedDateWIB,
-      p.unit === "kost" ? "Kost-Kostan" : "Gas LPG Eceran",
+      unitLabel,
       p.type === "income" ? "Pemasukan" : "Pengeluaran",
       p.category || "-",
       Number(p.amount) || 0,
@@ -300,8 +323,10 @@ function handleSingleSyncItem(ss, item) {
       const data = sheet.getDataRange().getValues();
       for (let r = 1; r < data.length; r++) {
         if (String(data[r][0]) === String(p.id)) {
+          const isSocialUnit = p.unit === "social" || (p.category && (p.category.indexOf("Sedekah") !== -1 || p.category.indexOf("Berbagi") !== -1));
+          const unitLabel = p.unit === "kost" ? "Kost-Kostan" : (isSocialUnit ? "Sedekah / Berbagi" : "Gas LPG Eceran");
           sheet.getRange(r + 1, 2).setValue(formattedDateWIB);
-          sheet.getRange(r + 1, 3).setValue(p.unit === "kost" ? "Kost-Kostan" : "Gas LPG Eceran");
+          sheet.getRange(r + 1, 3).setValue(unitLabel);
           sheet.getRange(r + 1, 4).setValue(p.type === "income" ? "Pemasukan" : "Pengeluaran");
           sheet.getRange(r + 1, 5).setValue(p.category || "-");
           sheet.getRange(r + 1, 6).setValue(Number(p.amount) || 0);
@@ -599,6 +624,15 @@ function handleSingleSyncItem(ss, item) {
           ]);
         });
       }
+    }
+  }
+
+  // 20. SINKRONISASI KATEGORI KUSTOM KELUARGA (VIA SCRIPT PROPERTIES - TANPA MERUSAK SKEMA 11 SHEET)
+  else if (action === "save_categories" && p.categories) {
+    try {
+      PropertiesService.getScriptProperties().setProperty("CUSTOM_CATEGORIES_JSON", JSON.stringify(p.categories));
+    } catch (pe) {
+      Logger.log("Gagal menyimpan custom categories: " + pe);
     }
   }
 }

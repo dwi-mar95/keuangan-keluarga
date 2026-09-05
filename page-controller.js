@@ -326,8 +326,40 @@
       // AUTO-SYNC DUA ARAH OTOMATIS SAAT APLIKASI DIBUKA (CLOUD TO CLIENT)
       if (window.SyncModule) {
         window.SyncModule.processPendingQueue();
-        window.SyncModule.pullFromSpreadsheet(false);
+        const localKel = (window.AppModule && window.AppModule.getKeluargaTransactions) ? window.AppModule.getKeluargaTransactions() : [];
+        const isFreshDevice = (!localKel || localKel.length === 0);
+        // Jika perangkat baru / local storage masih kosong (seperti saat laptop baru dibuka), tarik paksa seketika
+        window.SyncModule.pullFromSpreadsheet(isFreshDevice);
       }
+
+      // PROTEKSI PWA BACK BUTTON: Menutup modal aktif terlebih dahulu & konfirmasi keluar ramah
+      try {
+        if (!window.__pwaBackHistoryInit) {
+          window.__pwaBackHistoryInit = true;
+          history.pushState({ pwaHome: true }, "");
+
+          window.addEventListener("popstate", (e) => {
+            const openModals = Array.from(document.querySelectorAll(".modal-backdrop:not(.hidden)"));
+            if (openModals.length > 0) {
+              // Tutup modal paling atas yang sedang terbuka
+              const topModal = openModals[openModals.length - 1];
+              topModal.classList.add("hidden");
+              history.pushState({ pwaHome: true }, "");
+              return;
+            }
+
+            // Jika di layar utama dan pengguna menekan tombol Back:
+            history.pushState({ pwaHome: true }, "");
+            if (typeof showConfirm === "function") {
+              showConfirm("Tinggalkan Aplikasi?", "Apakah Anda yakin ingin keluar dari aplikasi Catatan Keuangan Keluarga?", { confirmText: "Ya, Keluar", cancelText: "Tetap di Aplikasi" }).then(confirmed => {
+                if (confirmed) {
+                  history.go(-2);
+                }
+              });
+            }
+          });
+        }
+      } catch (he) { }
     }
 
     if (document.readyState === "loading") {
@@ -818,6 +850,37 @@
       document.getElementById("categoryManagerModal").classList.add("hidden");
     }
 
+    function renderCategoryGroupDropdown() {
+      const select = document.getElementById("newCatGroupSelect");
+      const customInput = document.getElementById("newCatGroupCustom");
+      if (!select || !window.CategoriesModule) return;
+      const cats = window.CategoriesModule.getCategories()[activeCatTab] || [];
+      
+      let html = "";
+      cats.forEach(g => {
+        html += `<option value="${g.group}">${g.group}</option>`;
+      });
+      html += `<option value="__NEW__">➕ + Buat Kelompok Kategori Baru...</option>`;
+      select.innerHTML = html;
+
+      if (customInput) {
+        customInput.classList.add("hidden");
+        customInput.value = "";
+      }
+    }
+
+    function handleCatGroupSelectChange() {
+      const select = document.getElementById("newCatGroupSelect");
+      const customInput = document.getElementById("newCatGroupCustom");
+      if (!select || !customInput) return;
+      if (select.value === "__NEW__") {
+        customInput.classList.remove("hidden");
+        customInput.focus();
+      } else {
+        customInput.classList.add("hidden");
+      }
+    }
+
     function setCatManagerTab(type) {
       activeCatTab = type;
       const bExp = document.getElementById("btnCatTabExpense");
@@ -831,6 +894,7 @@
         bExp.className = "flex-1 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 cursor-pointer font-bold";
       }
 
+      renderCategoryGroupDropdown();
       renderCategoryManagerList();
     }
 
@@ -868,7 +932,19 @@
     }
 
     function handleAddNewCategorySubmit() {
-      const group = document.getElementById("newCatGroup").value.trim();
+      const select = document.getElementById("newCatGroupSelect");
+      const customInput = document.getElementById("newCatGroupCustom");
+      let group = "";
+      if (select) {
+        if (select.value === "__NEW__") {
+          group = customInput ? customInput.value.trim() : "";
+        } else {
+          group = select.value.trim();
+        }
+      } else if (document.getElementById("newCatGroup")) {
+        group = document.getElementById("newCatGroup").value.trim();
+      }
+
       const item = document.getElementById("newCatItem").value.trim();
 
       if (!group || !item) {
@@ -878,6 +954,11 @@
 
       window.CategoriesModule.addCategoryItem(activeCatTab, group, item);
       document.getElementById("newCatItem").value = "";
+      if (customInput) {
+        customInput.value = "";
+        customInput.classList.add("hidden");
+      }
+      renderCategoryGroupDropdown();
       renderCategoryManagerList();
       populateCategorySelect();
       showToast(`Pos "${item}" berhasil ditambahkan ke kategori "${group}"! ✨`, "success");
@@ -923,7 +1004,7 @@
       if (!tx) return;
 
       document.getElementById("editTxId").value = tx.id;
-      document.getElementById("editTxDate").value = tx.date ? tx.date.split("T")[0] : window.DateHelper.getTodayWIBString();
+      document.getElementById("editTxDate").value = window.DateHelper && window.DateHelper.toInputDateFormat ? window.DateHelper.toInputDateFormat(tx.date) : (tx.date ? tx.date.split("T")[0] : window.DateHelper.getTodayWIBString());
       if (document.getElementById("editTxType")) {
         document.getElementById("editTxType").value = tx.type || "expense";
       }
@@ -956,8 +1037,14 @@
         return;
       }
 
+      let txTime = "12:00:00";
+      if (window.DateHelper && dateVal === window.DateHelper.getTodayWIBString()) {
+        txTime = new Date().toTimeString().split(" ")[0];
+      }
+      const updatedDate = dateVal ? `${dateVal}T${txTime}+07:00` : new Date().toISOString();
+
       window.AppModule.updateTransaction(id, {
-        date: dateVal ? dateVal + "T12:00:00+07:00" : new Date().toISOString(),
+        date: updatedDate,
         type: txType,
         amount,
         category,
@@ -978,7 +1065,7 @@
       if (!tx) return;
 
       document.getElementById("editIbuTxId").value = tx.id;
-      document.getElementById("editIbuTxDate").value = tx.date ? tx.date.split("T")[0] : window.DateHelper.getTodayWIBString();
+      document.getElementById("editIbuTxDate").value = window.DateHelper && window.DateHelper.toInputDateFormat ? window.DateHelper.toInputDateFormat(tx.date) : (tx.date ? tx.date.split("T")[0] : window.DateHelper.getTodayWIBString());
       document.getElementById("editIbuTxUnit").value = tx.unit || "kost";
       document.getElementById("editIbuTxType").value = tx.type || "income";
       document.getElementById("editIbuTxCategory").value = tx.category || "";
@@ -1008,8 +1095,14 @@
         return;
       }
 
+      let txTime = "12:00:00";
+      if (window.DateHelper && dateVal === window.DateHelper.getTodayWIBString()) {
+        txTime = new Date().toTimeString().split(" ")[0];
+      }
+      const updatedDate = dateVal ? `${dateVal}T${txTime}+07:00` : new Date().toISOString();
+
       window.AppModule.updateIbuTransaction(id, {
-        date: dateVal ? dateVal + "T12:00:00+07:00" : new Date().toISOString(),
+        date: updatedDate,
         unit,
         type,
         category: category || (unit === "kost" ? "Sewa Kost" : "Gas LPG"),
@@ -1837,11 +1930,33 @@
       });
     }
 
+    function handleBillSelectChange() {
+      const select = document.getElementById("newBillSelect");
+      const customInput = document.getElementById("newBillNameCustom");
+      if (!select || !customInput) return;
+      if (select.value === "__CUSTOM__") {
+        customInput.classList.remove("hidden");
+        customInput.focus();
+      } else {
+        customInput.classList.add("hidden");
+      }
+    }
+
     // BILLS HANDLERS (GAMBAR 1)
     function handleAddNewBillSubmit() {
-      const name = document.getElementById("newBillName").value.trim();
-      const cost = Number(document.getElementById("newBillCost").value);
-      const dueDay = Number(document.getElementById("newBillDueDay").value) || 10;
+      const select = document.getElementById("newBillSelect");
+      const customInput = document.getElementById("newBillNameCustom");
+      let name = "";
+      if (select && select.value === "__CUSTOM__") {
+        name = customInput ? customInput.value.trim() : "";
+      } else if (select) {
+        name = select.value.trim();
+      } else if (document.getElementById("newBillName")) {
+        name = document.getElementById("newBillName").value.trim();
+      }
+
+      const cost = Number(document.getElementById("newBillCost") ? document.getElementById("newBillCost").value : 0);
+      const dueDay = Number(document.getElementById("newBillDueDay") ? document.getElementById("newBillDueDay").value : 10) || 10;
 
       if (!name || !cost) {
         showToast("Nama tagihan dan perkiraan biaya harus diisi!", "error");
@@ -2085,21 +2200,40 @@
       const body = document.getElementById("tabModalBody");
       modal.classList.remove("hidden");
 
-      // 1. GAMBAR 1: TAGIHAN RUTIN BULANAN (CRUD DINAMIS)
+      // 1. GAMBAR 1: TAGIHAN RUTIN BULANAN (CRUD DINAMIS DENGAN DROPDOWN MASTER KATEGORI)
       if (tab === "bills") {
         title.textContent = "📅 Checklist Tagihan Rutin Bulanan";
         const bills = window.BillsModule ? window.BillsModule.getMonthlyBills() : [];
+        const catData = window.CategoriesModule ? window.CategoriesModule.getCategories() : null;
+        let billOptions = [];
+        if (catData && catData.expense) {
+          const tagihanGroup = catData.expense.find(g => g.group && g.group.toLowerCase().includes("tagihan"));
+          if (tagihanGroup && tagihanGroup.items) {
+            billOptions = tagihanGroup.items.map(it => typeof it === "string" ? it : it.name);
+          }
+        }
+        if (billOptions.length === 0) {
+          billOptions = ["Listrik PLN", "Air PDAM", "Wifi & Internet Rumah", "BPJS Kesehatan", "Belanja Bulanan Sembako", "SPP Bulanan Sekolah Anak", "Iuran Sampah & Keamanan RT"];
+        }
+
         body.innerHTML = `
           <!-- Form Tambah Tagihan Baru -->
           <div class="p-3 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2">
             <div class="text-xs font-black text-blue-950">+ Tambah Tagihan Baru:</div>
-            <div class="grid grid-cols-2 gap-2 text-xs">
-              <input type="text" id="newBillName" placeholder="Nama (misal: Wifi Indihome)" class="bg-white border border-blue-200 rounded-lg px-2.5 py-1.5 font-bold outline-none">
-              <input type="number" id="newBillCost" placeholder="Perkiraan Biaya (Rp)" class="bg-white border border-blue-200 rounded-lg px-2.5 py-1.5 font-black outline-none">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div>
+                <select id="newBillSelect" onchange="handleBillSelectChange()" class="w-full bg-white border border-blue-200 rounded-lg px-2.5 py-1.5 font-bold outline-none text-slate-800">
+                  <option value="">-- Pilih Kategori Tagihan --</option>
+                  ${billOptions.map(opt => `<option value="${opt}">${opt}</option>`).join("")}
+                  <option value="__CUSTOM__">➕ Ketik Nama Tagihan Lain...</option>
+                </select>
+                <input type="text" id="newBillNameCustom" placeholder="Ketik nama tagihan lain..." class="w-full mt-1.5 bg-white border border-blue-200 rounded-lg px-2.5 py-1.5 font-bold outline-none text-slate-800 hidden">
+              </div>
+              <input type="number" id="newBillCost" placeholder="Perkiraan Biaya (Rp)" class="bg-white border border-blue-200 rounded-lg px-2.5 py-1.5 font-black outline-none text-slate-800">
             </div>
             <div class="flex gap-2 text-xs">
-              <input type="number" id="newBillDueDay" placeholder="Jatuh Tempo (Tgl 1-31)" min="1" max="31" class="flex-1 bg-white border border-blue-200 rounded-lg px-2.5 py-1.5 font-bold outline-none">
-              <button onclick="handleAddNewBillSubmit()" class="flex-1 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-sm">
+              <input type="number" id="newBillDueDay" placeholder="Jatuh Tempo (Tgl 1-31)" min="1" max="31" class="flex-1 bg-white border border-blue-200 rounded-lg px-2.5 py-1.5 font-bold outline-none text-slate-800">
+              <button onclick="handleAddNewBillSubmit()" class="flex-1 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-sm cursor-pointer">
                 + Tambah Tagihan
               </button>
             </div>
@@ -3381,7 +3515,7 @@
         const isKost = t.unit === "kost" && !isSocial;
         const isGas = t.unit === "gas" && !isSocial;
         const isIncome = t.type === "income";
-        const dateFormatted = t.date ? window.DateHelper.formatDateIndonesia(t.date.split("T")[0]) : "Hari Ini";
+        const dateFormatted = t.date ? (window.DateHelper.formatDateTimeCard ? window.DateHelper.formatDateTimeCard(t.date) : window.DateHelper.formatDateIndonesia(t.date.split("T")[0])) : "Hari Ini";
 
         let badgeClass = "bg-amber-100 text-amber-800";
         let badgeLabel = "🍳 Gas LPG";
@@ -3437,6 +3571,21 @@
           showToast("Catatan transaksi berhasil dihapus.", "info");
         }
       });
+    }
+
+    // Navigasi Filter Khusus Sedekah / Berbagi Usaha Ibu
+    function handleIbuSocialCardClick() {
+      ibuTxFilterUnit = "social";
+      const filterSelect = document.getElementById("ibuTxFilterUnit");
+      if (filterSelect) {
+        filterSelect.value = "social";
+      }
+      renderIbuTransactionList();
+      const listEl = document.getElementById("ibuTxHistorySection") || document.getElementById("ibuTxList");
+      if (listEl) {
+        listEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      if (window.showToast) window.showToast("Menampilkan daftar transaksi Sedekah & Berbagi 🎁", "info");
     }
 
     // ================= MODAL TRANSAKSI GAS CEPAT (BACKDATE & TEMPO) =================
@@ -3899,5 +4048,8 @@
       handleDeleteGoal,
       handleDepositGoalPrompt,
       handleWithdrawGoalPrompt,
-      handleRecordZakatExpense
+      handleRecordZakatExpense,
+      handleCatGroupSelectChange,
+      handleBillSelectChange,
+      handleIbuSocialCardClick
     });

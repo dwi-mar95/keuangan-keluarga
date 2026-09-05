@@ -406,7 +406,7 @@ function renderRecentTransactions(txs) {
   listEl.innerHTML = txs.slice(0, 15).map(tx => {
     const isIncome = tx.type === "income";
     const amountFormatted = isPrivacy ? "Rp ••••••••" : (isIncome ? `+ ${window.DateHelper.formatRupiah(tx.amount)}` : `- ${window.DateHelper.formatRupiah(tx.amount)}`);
-    const dateFormatted = window.DateHelper ? window.DateHelper.formatDateIndonesia(tx.date) : tx.date;
+    const dateFormatted = window.DateHelper && window.DateHelper.formatDateTimeCard ? window.DateHelper.formatDateTimeCard(tx.date) : (window.DateHelper ? window.DateHelper.formatDateIndonesia(tx.date) : tx.date);
     const userBadge = tx.user === "istri" ? "👩 Umma Atin" : "👨 Baba Pangestu";
 
     return `

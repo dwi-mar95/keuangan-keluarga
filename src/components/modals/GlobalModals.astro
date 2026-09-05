@@ -679,9 +679,21 @@
           <span>+ Tambah Pos Kategori Baru:</span>
           <button onclick="resetCategoriesDefaultPrompt()" class="text-[10px] text-slate-400 hover:text-slate-600 underline font-semibold cursor-pointer">Reset Bawaan</button>
         </div>
-        <div class="space-y-1.5 text-xs">
-          <input type="text" id="newCatGroup" placeholder="Kelompok Kategori (misal: Hobi / Kebutuhan Rumah)" class="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 font-bold outline-none">
-          <input type="text" id="newCatItem" placeholder="Nama Pos Baru (misal: Makanan Kucing / Les Renang)" class="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 font-bold outline-none">
+        <div class="space-y-2 text-xs">
+          <!-- Dropdown Kelompok Kategori yang Sudah Ada -->
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-slate-500 uppercase">Kelompok Kategori Induk:</label>
+            <select id="newCatGroupSelect" onchange="handleCatGroupSelectChange()" class="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 font-bold outline-none cursor-pointer">
+              <!-- Populated by JS -->
+            </select>
+            <!-- Input teks jika ingin menambah kelompok baru -->
+            <input type="text" id="newCatGroupCustom" placeholder="Ketik Nama Kelompok Baru..." class="hidden w-full bg-white border border-emerald-400 rounded-lg px-2.5 py-1.5 font-bold outline-none mt-1">
+          </div>
+          <!-- Input Nama Pos Baru -->
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-slate-500 uppercase">Nama Pos Kategori Baru:</label>
+            <input type="text" id="newCatItem" placeholder="Nama Pos Baru (misal: Makanan Kucing / Les Renang)" class="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 font-bold outline-none">
+          </div>
         </div>
         <button onclick="handleAddNewCategorySubmit()" class="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs transition-all shadow-sm flex items-center justify-center gap-1 cursor-pointer">
           <span>+ Simpan Pos Kategori Baru</span>

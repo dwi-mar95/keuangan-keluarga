@@ -144,9 +144,21 @@ function getCategories() {
   return CATEGORIES_DATA;
 }
 
-// Simpan kustomisasi kategori
-function saveCategories(cats) {
+// Simpan kustomisasi kategori (Lokal & Cloud Sync Otomatis Antar Perangkat)
+function saveCategories(cats, shouldSync = true) {
   localStorage.setItem("keuangan_keluarga_categories", JSON.stringify(cats));
+  if (shouldSync && window.SyncModule && window.SyncModule.pushTransactionToSyncQueue) {
+    window.SyncModule.pushTransactionToSyncQueue("save_categories", { categories: cats });
+  }
+}
+
+// Terapkan Kategori Kustom dari Cloud ke Browser Lokal
+function applyRemoteCategories(remoteCats) {
+  if (!remoteCats || typeof remoteCats !== "object") return false;
+  if (!Array.isArray(remoteCats.expense) && !Array.isArray(remoteCats.income)) return false;
+  
+  localStorage.setItem("keuangan_keluarga_categories", JSON.stringify(remoteCats));
+  return true;
 }
 
 // Tambah Kategori / Sub-kategori baru
@@ -170,7 +182,7 @@ function addCategoryItem(type = "expense", groupName, itemName, defaultWallet = 
     g.items.push({ name: itemName.trim(), defaultWallet: defaultWallet || "Kas Tunai" });
   }
 
-  saveCategories(cats);
+  saveCategories(cats, true);
   return cats;
 }
 
@@ -184,7 +196,7 @@ function editCategoryItem(type = "expense", groupName, oldItemName, newItemName)
     const item = g.items.find(i => i.name.toLowerCase() === oldItemName.trim().toLowerCase());
     if (item) {
       item.name = newItemName.trim();
-      saveCategories(cats);
+      saveCategories(cats, true);
     }
   }
   return cats;
@@ -201,7 +213,7 @@ function deleteCategoryItem(type = "expense", groupName, itemName) {
     if (g.items.length === 0) {
       cats[type] = cats[type].filter(x => x.group.toLowerCase() !== groupName.trim().toLowerCase());
     }
-    saveCategories(cats);
+    saveCategories(cats, true);
   }
   return cats;
 }
@@ -209,6 +221,9 @@ function deleteCategoryItem(type = "expense", groupName, itemName) {
 // Reset Kategori ke default bawaan
 function resetCategoriesToDefault() {
   localStorage.removeItem("keuangan_keluarga_categories");
+  if (window.SyncModule && window.SyncModule.pushTransactionToSyncQueue) {
+    window.SyncModule.pushTransactionToSyncQueue("save_categories", { categories: CATEGORIES_DATA });
+  }
   return CATEGORIES_DATA;
 }
 
@@ -216,6 +231,7 @@ window.CategoriesModule = {
   CATEGORIES_DATA,
   getCategories,
   saveCategories,
+  applyRemoteCategories,
   addCategoryItem,
   editCategoryItem,
   deleteCategoryItem,

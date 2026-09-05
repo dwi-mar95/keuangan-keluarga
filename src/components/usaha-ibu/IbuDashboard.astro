@@ -55,9 +55,10 @@
           <div class="text-[9px] text-slate-400 font-semibold">Siap kulakan supplier</div>
         </div>
 
-        <div class="glass-card p-3.5 space-y-1 bg-teal-50/50 border-teal-200/80 col-span-2 sm:col-span-1">
-          <div class="text-[10px] font-extrabold text-teal-800 uppercase flex items-center gap-1">
-            <span>🎁</span> Sedekah / Berbagi
+        <div onclick="handleIbuSocialCardClick()" class="glass-card p-3.5 space-y-1 bg-teal-50/50 border-teal-200/80 col-span-2 sm:col-span-1 cursor-pointer hover:bg-teal-100/60 hover:border-teal-300 transition-all shadow-2xs group" title="Klik untuk lihat riwayat / edit sedekah">
+          <div class="text-[10px] font-extrabold text-teal-800 uppercase flex items-center justify-between">
+            <span class="flex items-center gap-1"><span>🎁</span> Sedekah / Berbagi</span>
+            <span class="text-[9px] text-teal-600 underline font-bold opacity-80 group-hover:opacity-100">Kelola ➔</span>
           </div>
           <div id="ibuSocialTotal" class="text-lg font-black text-teal-700">Rp 0</div>
           <div id="ibuSocialCount" class="text-[9px] text-teal-600 font-semibold">0 kali berbagi</div>
