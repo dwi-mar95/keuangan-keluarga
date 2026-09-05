@@ -56,8 +56,11 @@ function formatDateTimeIndonesia(dateInput) {
   return `${hari}, ${tgl} ${bln} ${thn} - ${jam}:${menit} WIB`;
 }
 
-// Format nominal Rupiah rapi
-function formatRupiah(amount) {
+// Format nominal Rupiah rapi (Mendukung Privacy Mode Sensor Angka)
+function formatRupiah(amount, ignorePrivacy = false) {
+  if (!ignorePrivacy && window.AuthModule && typeof window.AuthModule.isPrivacyMode === "function" && window.AuthModule.isPrivacyMode()) {
+    return "Rp ••••••••";
+  }
   const num = Number(amount) || 0;
   return `Rp ${num.toLocaleString("id-ID")}`;
 }

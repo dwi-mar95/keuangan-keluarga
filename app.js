@@ -353,8 +353,9 @@ function renderDashboard() {
   if (bKel) bKel.textContent = kelCount;
   if (bIbu) bIbu.textContent = ibuCount;
 
-  // Render Charts
+  // Render Charts & Upcoming Due Dates Widget
   renderCharts(metrics);
+  renderUpcomingDueWidget();
   renderDynamicWalletBar();
   renderDynamicPresetsBar();
   updateWalletDom();
@@ -440,36 +441,326 @@ function renderRecentTransactions(txs) {
   }).join("");
 }
 
-// Render Charts menggunakan Chart.js
+// ================= WIDGET: JADWAL & TAGIHAN TERDEKAT (7 HARI KE DEPAN) =================
+function renderUpcomingDueWidget() {
+  const container = document.getElementById("upcomingDueDatesContainer");
+  if (!container) return;
+
+  const now = window.DateHelper ? window.DateHelper.getNowWIB() : new Date();
+  const currentDay = now.getDate();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+  const upcomingItems = [];
+
+  // 1. Tagihan Rutin Bulanan
+  if (window.BillsModule && window.BillsModule.getMonthlyBills) {
+    const bills = window.BillsModule.getMonthlyBills() || [];
+    bills.forEach(b => {
+      if (b.status !== "paid") {
+        const dueDay = Number(b.dueDay) || 1;
+        let diff = dueDay - currentDay;
+        if (diff < 0 && (diff + daysInCurrentMonth) <= 7) {
+          diff += daysInCurrentMonth;
+        }
+        if (diff >= 0 && diff <= 7) {
+          upcomingItems.push({
+            id: b.id,
+            module: "bills",
+            category: "Tagihan Bulanan",
+            title: b.name || "Tagihan",
+            amount: Number(b.estimatedCost) || 0,
+            daysDiff: diff,
+            dueText: diff === 0 ? "Hari Ini!" : (diff === 1 ? "Besok" : `${diff} hari lagi`),
+            urgency: diff === 0 ? "urgent" : (diff <= 2 ? "warning" : "normal"),
+            actionLabel: "Bayar Tagihan",
+            actionClick: "openTabModal('bills')"
+          });
+        }
+      }
+    });
+  }
+
+  // 2. Sewa Kamar Kost Usaha Ibu
+  if (window.IbuKostModule && window.IbuKostModule.getKostRooms) {
+    const rooms = window.IbuKostModule.getKostRooms() || [];
+    rooms.forEach(r => {
+      const isUnpaid = r.statusBulanIni === "unpaid" || r.statusBulanIni === "partial";
+      const hasTenant = r.tenantName && !r.tenantName.includes("Kosong");
+      if (isUnpaid && hasTenant) {
+        const dueDay = Number(r.dueDay) || 1;
+        let diff = dueDay - currentDay;
+        if (diff < 0 && (diff + daysInCurrentMonth) <= 7) {
+          diff += daysInCurrentMonth;
+        }
+        if (diff >= 0 && diff <= 7) {
+          upcomingItems.push({
+            id: r.id,
+            module: "kost",
+            category: "Sewa Kost Usaha Ibu",
+            title: `Kamar ${r.roomNumber} (${r.tenantName})`,
+            amount: Number(r.monthlyRent) || 0,
+            daysDiff: diff,
+            dueText: diff === 0 ? "Hari Ini!" : (diff === 1 ? "Besok" : `${diff} hari lagi`),
+            urgency: diff === 0 ? "urgent" : (diff <= 2 ? "warning" : "normal"),
+            actionLabel: r.tenantPhone ? "Tagih via WA" : "Catat Bayar",
+            actionClick: r.tenantPhone ? `window.WhatsAppModule.sendKostReminder(${JSON.stringify(r).replace(/"/g, '&quot;')})` : `openTabModal('kost')`
+          });
+        }
+      }
+    });
+  }
+
+  // 3. Servis & Ganti Oli Kendaraan
+  try {
+    const rawVeh = localStorage.getItem("keuangan_keluarga_vehicles");
+    if (rawVeh) {
+      const vehicles = JSON.parse(rawVeh);
+      if (Array.isArray(vehicles)) {
+        vehicles.forEach(v => {
+          if (v.nextOilDate) {
+            const vDate = new Date(v.nextOilDate);
+            if (!isNaN(vDate.getTime())) {
+              const diffMs = vDate.getTime() - now.getTime();
+              const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+              if (diffDays >= -2 && diffDays <= 7) {
+                upcomingItems.push({
+                  id: v.id,
+                  module: "vehicle",
+                  category: "Servis Kendaraan",
+                  title: `Ganti Oli: ${v.name} (${v.plat || '-'})`,
+                  amount: 0,
+                  daysDiff: Math.max(0, diffDays),
+                  dueText: diffDays <= 0 ? "Waktunya Servis!" : (diffDays === 1 ? "Besok" : `${diffDays} hari lagi`),
+                  urgency: diffDays <= 1 ? "urgent" : "warning",
+                  actionLabel: "Lihat Jadwal",
+                  actionClick: "openTabModal('vehicles')"
+                });
+              }
+            }
+          }
+        });
+      }
+    }
+  } catch (ve) { }
+
+  // 4. Tempo / Bon Gas Usaha Ibu
+  try {
+    const rawTempo = localStorage.getItem("usaha_ibu_tempo_records");
+    if (rawTempo) {
+      const tempos = JSON.parse(rawTempo);
+      if (Array.isArray(tempos)) {
+        tempos.forEach(t => {
+          if (!t.isLunas && t.dueDate) {
+            const tDate = new Date(t.dueDate);
+            if (!isNaN(tDate.getTime())) {
+              const diffMs = tDate.getTime() - now.getTime();
+              const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+              if (diffDays >= 0 && diffDays <= 7) {
+                upcomingItems.push({
+                  id: t.id,
+                  module: "tempo",
+                  category: "Tempo Bon Usaha Ibu",
+                  title: `Janji Bayar: ${t.customerName || t.title}`,
+                  amount: Number(t.amount) || 0,
+                  daysDiff: diffDays,
+                  dueText: diffDays === 0 ? "Hari Ini!" : (diffDays === 1 ? "Besok" : `${diffDays} hari lagi`),
+                  urgency: diffDays === 0 ? "urgent" : (diffDays <= 2 ? "warning" : "normal"),
+                  actionLabel: "Buka Buku Tempo",
+                  actionClick: "openTabModal('gas')"
+                });
+              }
+            }
+          }
+        });
+      }
+    }
+  } catch (te) { }
+
+  // Urutkan berdasarkan yang paling mendesak (hari terdekat)
+  upcomingItems.sort((a, b) => a.daysDiff - b.daysDiff);
+
+  // Jika TIDAK ada tagihan dalam 7 hari ke depan
+  if (upcomingItems.length === 0) {
+    container.innerHTML = `
+      <div class="glass-card p-3.5 bg-gradient-to-r from-emerald-50/90 to-teal-50/70 border border-emerald-200/80 rounded-2xl flex items-center justify-between gap-3 shadow-2xs">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg shrink-0 font-bold">
+            🎉
+          </div>
+          <div>
+            <div class="text-xs font-black text-slate-800 flex items-center gap-1.5">
+              <span>Semua Tagihan & Jadwal Aman</span>
+              <span class="text-[9.5px] font-extrabold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full">7 Hari ke Depan</span>
+            </div>
+            <p class="text-[10.5px] text-slate-500 mt-0.5 leading-snug">
+              Alhamdulillah, tidak ada tagihan rutin, sewa kost, atau jadwal servis yang jatuh tempo pekan ini.
+            </p>
+          </div>
+        </div>
+        <button type="button" onclick="openTabModal('bills')" class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs">
+          Lihat Semua Tagihan ➔
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  // Jika ADA tagihan jatuh tempo
+  const isPrivacy = window.AuthModule ? window.AuthModule.isPrivacyMode() : false;
+
+  container.innerHTML = `
+    <div class="glass-card p-4 space-y-3 border-l-4 border-l-amber-500 rounded-2xl shadow-2xs bg-gradient-to-br from-white via-amber-50/20 to-white">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center text-base shrink-0 font-bold">
+            📅
+          </div>
+          <div>
+            <h3 class="text-xs font-black text-slate-900 flex items-center gap-1.5">
+              <span>Jadwal & Tagihan Terdekat</span>
+              <span class="text-[9.5px] font-extrabold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full">
+                ${upcomingItems.length} Perlu Perhatian
+              </span>
+            </h3>
+            <p class="text-[10px] text-slate-400 font-medium">Jatuh tempo dalam 7 hari ke depan (Tagihan, Kost, Servis, Tempo)</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
+        ${upcomingItems.map(item => {
+          let badgeClass = "bg-slate-100 text-slate-700";
+          if (item.urgency === "urgent") badgeClass = "bg-rose-100 text-rose-800 border border-rose-300 font-black animate-pulse";
+          else if (item.urgency === "warning") badgeClass = "bg-amber-100 text-amber-800 border border-amber-300 font-bold";
+
+          const amountFormatted = item.amount > 0 ? (isPrivacy ? "Rp ••••••••" : (window.DateHelper ? window.DateHelper.formatRupiah(item.amount) : `Rp ${item.amount.toLocaleString('id-ID')}`)) : "";
+
+          return `
+            <div class="p-2.5 rounded-xl bg-white border border-slate-200/80 hover:border-amber-300 transition-all shadow-2xs space-y-2 flex flex-col justify-between">
+              <div class="space-y-1">
+                <div class="flex items-center justify-between gap-1.5">
+                  <span class="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">${item.category}</span>
+                  <span class="text-[9.5px] px-2 py-0.5 rounded-md ${badgeClass}">${item.dueText}</span>
+                </div>
+                <div class="text-xs font-bold text-slate-800 truncate" title="${item.title}">${item.title}</div>
+                ${amountFormatted ? `<div class="text-xs font-black text-slate-900">${amountFormatted}</div>` : ''}
+              </div>
+              <div class="pt-1 border-t border-slate-100 flex items-center justify-end">
+                <button type="button" onclick="${item.actionClick}" class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10.5px] font-extrabold transition-all cursor-pointer inline-flex items-center gap-1 shadow-2xs">
+                  <span>${item.actionLabel} ➔</span>
+                </button>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+// Render Charts menggunakan Chart.js (Interaktif, Vibrant, & Komparasi Presisi)
 function renderCharts(metrics) {
+  const isPrivacy = window.AuthModule ? window.AuthModule.isPrivacyMode() : false;
+
   // Chart 1: Donut Kategori Pengeluaran
   const catCanvas = document.getElementById("categoryChart");
   if (catCanvas && window.Chart) {
-    const labels = Object.keys(metrics.categoryMap);
-    const dataVals = Object.values(metrics.categoryMap);
+    const rawCategories = metrics.categoryMap || {};
+    const labels = Object.keys(rawCategories);
+    const dataVals = Object.values(rawCategories);
+    const totalExp = dataVals.reduce((sum, v) => sum + Number(v), 0);
 
     if (AppState.categoryChart) AppState.categoryChart.destroy();
 
-    AppState.categoryChart = new Chart(catCanvas, {
-      type: "doughnut",
-      data: {
-        labels: labels.length > 0 ? labels : ["Belum ada belanja"],
-        datasets: [{
-          data: dataVals.length > 0 ? dataVals : [1],
-          backgroundColor: ["#10b981", "#f59e0b", "#0ea5e9", "#ec4899", "#8b5cf6", "#f97316", "#64748b"],
-          borderWidth: 2,
-          borderColor: "#ffffff"
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 10 } } }
+    const chartColors = [
+      "#10b981", "#0ea5e9", "#f59e0b", "#ec4899", 
+      "#8b5cf6", "#f97316", "#06b6d4", "#14b8a6", 
+      "#e11d48", "#64748b"
+    ];
+
+    if (dataVals.length === 0 || totalExp === 0) {
+      AppState.categoryChart = new Chart(catCanvas, {
+        type: "doughnut",
+        data: {
+          labels: ["Belum Ada Pengeluaran"],
+          datasets: [{
+            data: [1],
+            backgroundColor: ["#e2e8f0"],
+            borderWidth: 2,
+            borderColor: "#ffffff"
+          }]
         },
-        cutout: "68%"
-      }
-    });
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 10 } } },
+            tooltip: { enabled: false }
+          },
+          cutout: "70%"
+        }
+      });
+    } else {
+      AppState.categoryChart = new Chart(catCanvas, {
+        type: "doughnut",
+        data: {
+          labels: labels,
+          datasets: [{
+            data: dataVals,
+            backgroundColor: chartColors.slice(0, labels.length),
+            hoverOffset: 6,
+            borderWidth: 2,
+            borderColor: "#ffffff"
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { animateRotate: true, duration: 800 },
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: {
+                boxWidth: 10,
+                font: { size: 10, weight: "bold" },
+                padding: 10,
+                generateLabels: (chart) => {
+                  const data = chart.data;
+                  if (data.labels.length && data.datasets.length) {
+                    return data.labels.map((label, i) => {
+                      const val = data.datasets[0].data[i];
+                      const pct = totalExp > 0 ? Math.round((val / totalExp) * 100) : 0;
+                      return {
+                        text: `${label} (${pct}%)`,
+                        fillStyle: data.datasets[0].backgroundColor[i],
+                        strokeStyle: data.datasets[0].borderColor,
+                        lineWidth: data.datasets[0].borderWidth,
+                        hidden: isNaN(data.datasets[0].data[i]) || chart.getDatasetMeta(0).data[i].hidden,
+                        index: i
+                      };
+                    });
+                  }
+                  return [];
+                }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  const val = context.parsed;
+                  const pct = totalExp > 0 ? ((val / totalExp) * 100).toFixed(1) : 0;
+                  const nominal = isPrivacy ? "Rp ••••••••" : (window.DateHelper ? window.DateHelper.formatRupiah(val, true) : `Rp ${val.toLocaleString('id-ID')}`);
+                  return ` ${context.label}: ${nominal} (${pct}%)`;
+                }
+              }
+            }
+          },
+          cutout: "68%"
+        }
+      });
+    }
   }
 
   // Chart 2: Komparasi Belanja Suami vs Istri
@@ -477,25 +768,63 @@ function renderCharts(metrics) {
   if (spouseCanvas && window.Chart) {
     if (AppState.spouseComparisonChart) AppState.spouseComparisonChart.destroy();
 
+    const sExp = Number(metrics.suamiExpense) || 0;
+    const iExp = Number(metrics.istriExpense) || 0;
+    const totalSpouse = sExp + iExp;
+
+    const sPct = totalSpouse > 0 ? Math.round((sExp / totalSpouse) * 100) : 0;
+    const iPct = totalSpouse > 0 ? Math.round((iExp / totalSpouse) * 100) : 0;
+
     AppState.spouseComparisonChart = new Chart(spouseCanvas, {
       type: "bar",
       data: {
-        labels: ["👨 Baba Pangestu", "👩 Umma Atin (Istri)"],
+        labels: [`👨 Baba (${sPct}%)`, `👩 Umma (${iPct}%)`],
         datasets: [{
           label: "Total Belanja",
-          data: [metrics.suamiExpense, metrics.istriExpense],
+          data: [sExp, iExp],
           backgroundColor: ["#0ea5e9", "#ec4899"],
-          borderRadius: 8
+          hoverBackgroundColor: ["#0284c7", "#db2777"],
+          borderRadius: 10,
+          borderSkipped: false,
+          barPercentage: 0.55
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: { duration: 800 },
         scales: {
-          y: { beginAtZero: true, ticks: { font: { size: 9 } } },
-          x: { ticks: { font: { size: 10, weight: "bold" } } }
+          y: {
+            beginAtZero: true,
+            ticks: {
+              font: { size: 9 },
+              callback: function (val) {
+                if (isPrivacy) return "•••";
+                if (val >= 1000000) return (val / 1000000).toFixed(1) + " Jt";
+                if (val >= 1000) return (val / 1000).toFixed(0) + " Rb";
+                return val;
+              }
+            },
+            grid: { color: "#f1f5f9" }
+          },
+          x: {
+            ticks: { font: { size: 10, weight: "bold" }, color: "#334155" },
+            grid: { display: false }
+          }
         },
-        plugins: { legend: { display: false } }
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                const val = context.parsed.y;
+                const pct = totalSpouse > 0 ? ((val / totalSpouse) * 100).toFixed(1) : 0;
+                const nominal = isPrivacy ? "Rp ••••••••" : (window.DateHelper ? window.DateHelper.formatRupiah(val, true) : `Rp ${val.toLocaleString('id-ID')}`);
+                return ` Belanja: ${nominal} (${pct}%)`;
+              }
+            }
+          }
+        }
       }
     });
   }

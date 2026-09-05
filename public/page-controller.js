@@ -41,6 +41,20 @@
       } else {
         if (lockScreen) lockScreen.classList.add("hidden");
       }
+
+      // 4. Sinkronkan Ikon & Warna Tombol Privasi Sesuai Status Aktif
+      if (window.AuthModule && window.AuthModule.isPrivacyMode) {
+        const isPrivacy = window.AuthModule.isPrivacyMode();
+        const btn = document.getElementById("btnPrivacyToggle");
+        const icon = document.getElementById("privacyEyeIcon");
+        if (btn && isPrivacy) {
+          btn.className = "w-8 h-8 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-800 flex items-center justify-center transition-all cursor-pointer shadow-xs";
+          btn.setAttribute("title", "Mode Privasi Aktif (Klik untuk Tampilkan Saldo)");
+        }
+        if (icon && isPrivacy) {
+          icon.setAttribute("data-lucide", "eye-off");
+        }
+      }
     }
 
     function getTargetPinLength() {
@@ -669,8 +683,39 @@
 
     function handleTogglePrivacy() {
       if (window.AuthModule) {
-        window.AuthModule.togglePrivacyMode();
-        window.AppModule.renderDashboard();
+        const isPrivacy = window.AuthModule.togglePrivacyMode();
+        
+        // Update Ikon & Tombol di Header
+        const btn = document.getElementById("btnPrivacyToggle");
+        const icon = document.getElementById("privacyEyeIcon");
+        if (btn) {
+          if (isPrivacy) {
+            btn.className = "w-8 h-8 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-800 flex items-center justify-center transition-all cursor-pointer shadow-xs";
+            btn.setAttribute("title", "Mode Privasi Aktif (Klik untuk Tampilkan Saldo)");
+          } else {
+            btn.className = "w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-all cursor-pointer";
+            btn.setAttribute("title", "Mode Privasi (Sensor Saldo)");
+          }
+        }
+        if (icon) {
+          icon.setAttribute("data-lucide", isPrivacy ? "eye-off" : "eye");
+          if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+        }
+
+        // Render ulang dashboard dan buku kas
+        if (window.AppModule && window.AppModule.renderDashboard) {
+          window.AppModule.renderDashboard();
+        }
+        if (window.AppModule && window.AppModule.renderIbuDashboard) {
+          window.AppModule.renderIbuDashboard();
+        }
+        if (typeof renderIbuKostList === "function") renderIbuKostList();
+        if (typeof renderIbuGasBonList === "function") renderIbuGasBonList();
+        if (typeof renderIbuTransactionList === "function") renderIbuTransactionList();
+
+        if (typeof showToast === "function") {
+          showToast(isPrivacy ? "Mode Privasi Aktif: Seluruh saldo disamarkan 🔒" : "Mode Privasi Nonaktif: Saldo ditampilkan 👁️", "info");
+        }
       }
     }
 
