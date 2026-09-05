@@ -90,7 +90,7 @@ function doGet(e) {
       const payload = {
         status: "success",
         cached: false,
-        timestamp: Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy HH:mm:ss"),
+        timestamp: Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd HH:mm:ss"),
         keluarga_txs: getSheetDataAsJson(getSheetSafe(ss, "Keluarga_Transaksi")),
         ibu_txs: getSheetDataAsJson(getSheetSafe(ss, "Usaha_Ibu_Transaksi")),
         bills: getSheetDataAsJson(getSheetSafe(ss, "Tagihan_Rutin_Bulanan")),
