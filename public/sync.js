@@ -105,6 +105,11 @@ async function processPendingQueue() {
 
       console.log("Sync ke Google Spreadsheet berhasil!");
       window.dispatchEvent(new CustomEvent("sync-completed", { detail: { success: true } }));
+
+      // Ambil data terbaru dari server setelah commit selesai agar cache server ter-update presisi
+      setTimeout(() => {
+        pullFromSpreadsheet(true);
+      }, 750);
     }
   } catch (err) {
     console.warn("Gagal mengirim ke Google Spreadsheet, akan dicoba lagi nanti:", err);
@@ -112,6 +117,10 @@ async function processPendingQueue() {
     isSyncing = false;
   }
 }
+
+// Throttle & Smart Protection untuk Mencegah Race Condition Overwrite
+let lastPullTime = 0;
+const MIN_PULL_INTERVAL = 30000; // 30 detik interval minimal auto-pull di background
 
 // Helper: Parsing tanggal dari Google Spreadsheet agar tanggal riil transaksi masa lalu tetap utuh presisi
 function parseSpreadsheetDateToISO(raw) {
@@ -160,7 +169,7 @@ function parseSpreadsheetDateToISO(raw) {
   return !isNaN(d.getTime()) ? d.toISOString() : new Date().toISOString();
 }
 
-// Tarik data terbaru dari Google Spreadsheet ke HP (GET Two-Way Sync High Speed)
+// Tarik data terbaru dari Google Spreadsheet ke HP (GET Two-Way Sync High Speed dengan Smart Anti-Revert)
 async function pullFromSpreadsheet(force = false) {
   const apiUrl = getSpreadsheetApiUrl();
   if (!apiUrl) {
@@ -168,18 +177,38 @@ async function pullFromSpreadsheet(force = false) {
     return;
   }
 
+  // PROTEKSI SMART ANTI-REVERT: Jika masih ada antrean edit yang belum terkirim, jangan timpa dengan data lama!
+  const pending = getPendingQueue();
+  if (!force && pending.length > 0) {
+    console.log("Auto-pull ditunda untuk melindungi data edit lokal yang sedang antre disinkronkan");
+    return;
+  }
+
+  // PROTEKSI THROTTLE: Jangan spam GET saat switch tab/fokus berkali-kali
+  const now = Date.now();
+  if (!force && (now - lastPullTime < MIN_PULL_INTERVAL)) {
+    return;
+  }
+  lastPullTime = now;
+
   try {
     if (force && window.showToast) window.showToast("Menyelaraskan data dari Google Sheets... 🔄", "info");
 
-    const cacheBuster = `&_t=${Date.now()}${force ? '&force=true' : ''}`;
+    const cacheBuster = `&_t=${Date.now()}${force ? '&force=true&nocache=true' : ''}`;
     const res = await fetch(apiUrl + "?action=fetch_all" + cacheBuster);
     const data = await res.json();
 
     if (data && data.status === "success") {
       let updatedCount = 0;
 
-      // 1. Sinkronisasi Transaksi Keluarga
+      // 1. Sinkronisasi Transaksi Keluarga (Dengan Smart Merge)
       if (Array.isArray(data.keluarga_txs)) {
+        const localTxs = (window.AppModule && window.AppModule.getTransactions) ? window.AppModule.getTransactions() : [];
+        const pendingQueue = getPendingQueue();
+        const pendingKeluargaIds = new Set(
+          pendingQueue.filter(item => item.action && item.action.includes("keluarga_tx") && item.payload && item.payload.id).map(item => item.payload.id)
+        );
+
         const mapped = data.keluarga_txs.map(r => ({
           id: String(r["ID Transaksi"] || "tx_" + Date.now()),
           date: parseSpreadsheetDateToISO(r["Waktu WIB"]),
@@ -191,15 +220,31 @@ async function pullFromSpreadsheet(force = false) {
           user: (r["Pencatat"] || "").toLowerCase().includes("umma") || (r["Pencatat"] || "").toLowerCase().includes("istri") ? "istri" : "suami",
           note: r["Keterangan"] || ""
         }));
-        localStorage.setItem("keuangan_keluarga_transactions", JSON.stringify(mapped));
+
+        // Pertahankan editan lokal yang masih ada di antrean sync
+        const finalKeluarga = mapped.map(remote => {
+          if (pendingKeluargaIds.has(remote.id)) {
+            const localMatch = localTxs.find(l => l.id === remote.id);
+            return localMatch || remote;
+          }
+          return remote;
+        });
+
+        localStorage.setItem("keuangan_keluarga_transactions", JSON.stringify(finalKeluarga));
         if (window.AppModule && window.AppModule.saveKeluargaTransactions) {
-          window.AppModule.saveKeluargaTransactions(mapped);
+          window.AppModule.saveKeluargaTransactions(finalKeluarga);
         }
         updatedCount++;
       }
 
-      // 2. Sinkronisasi Transaksi Usaha Ibu
+      // 2. Sinkronisasi Transaksi Usaha Ibu (Dengan Smart Anti-Revert Merge)
       if (Array.isArray(data.ibu_txs)) {
+        const localIbu = (window.AppModule && window.AppModule.getIbuTransactions) ? window.AppModule.getIbuTransactions() : [];
+        const pendingQueue = getPendingQueue();
+        const pendingIbuIds = new Set(
+          pendingQueue.filter(item => item.action && item.action.includes("ibu_tx") && item.payload && item.payload.id).map(item => item.payload.id)
+        );
+
         const mappedIbu = data.ibu_txs.map(r => ({
           id: String(r["ID Transaksi"] || "ibu_" + Date.now()),
           date: parseSpreadsheetDateToISO(r["Waktu WIB"]),
@@ -210,9 +255,29 @@ async function pullFromSpreadsheet(force = false) {
           profit: Number(r["Laba Bersih (Rp)"]) || 0,
           note: r["Keterangan"] || ""
         }));
-        localStorage.setItem("keuangan_keluarga_ibu_transactions", JSON.stringify(mappedIbu));
+
+        // Smart Merge: Jika item baru saja diedit di antrean lokal, JANGAN TIMPA dengan data lama server
+        const finalIbu = mappedIbu.map(remoteItem => {
+          if (pendingIbuIds.has(remoteItem.id)) {
+            const localMatch = localIbu.find(l => l.id === remoteItem.id);
+            return localMatch || remoteItem;
+          }
+          return remoteItem;
+        });
+
+        // Tambahkan item lokal yang baru dibuat offline dan belum tercatat di spreadsheet
+        localIbu.forEach(localItem => {
+          if (pendingIbuIds.has(localItem.id) && !finalIbu.some(f => f.id === localItem.id)) {
+            finalIbu.unshift(localItem);
+          }
+        });
+
+        // Urutkan tanggal terbaru
+        finalIbu.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        localStorage.setItem("keuangan_keluarga_ibu_transactions", JSON.stringify(finalIbu));
         if (window.AppModule && window.AppModule.saveIbuTransactions) {
-          window.AppModule.saveIbuTransactions(mappedIbu);
+          window.AppModule.saveIbuTransactions(finalIbu);
         }
         updatedCount++;
       }

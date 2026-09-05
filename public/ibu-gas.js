@@ -272,6 +272,51 @@ function addGasBon(customerName, qty, amount) {
   });
 }
 
+// Catat Pemberian / Sedekah Usaha Ibu (Mbah & Tetangga)
+// Terintegrasi ke Kas Usaha Ibu & Pengurangan Stok Gas Otomatis (100% Sesuai Skema 11 Sheet)
+function recordIbuSocialGift({ type = "gas", recipient = "Mbah / Tetangga", amount = 0, note = "", date = null }) {
+  const inv = getGasInventory();
+  const txDate = date ? date + "T12:00:00+07:00" : new Date().toISOString();
+  let nominalBiaya = Number(amount) || 0;
+  let keteranganLengkap = "";
+
+  if (type === "gas") {
+    // Memberikan tabung gas gratis untuk Mbah/tetangga
+    if (inv.tabungIsi < 1) {
+      if (window.showToast) window.showToast("Stok tabung gas isi sedang kosong!", "warning");
+      else alert("Stok tabung gas isi sedang kosong!");
+      return false;
+    }
+    const hargaModal = inv.hargaModalDefault || 18500;
+    nominalBiaya = hargaModal;
+
+    // Update stok: tabung isi berkurang 1, tabung kosong bertambah 1
+    inv.tabungIsi = Math.max(0, inv.tabungIsi - 1);
+    inv.tabungKosong += 1;
+    saveGasInventory(inv);
+
+    keteranganLengkap = `Pemberian 1 Tabung Gas Gratis untuk ${recipient}${note ? ` (${note})` : ''}`;
+  } else {
+    // Bantuan uang tunai / santunan dari kas usaha ibu
+    keteranganLengkap = `Bantuan / Sedekah Kas Ibu untuk ${recipient}${note ? ` (${note})` : ''}`;
+  }
+
+  // Catat transaksi pengeluaran sosial ke Buku Kas Usaha Ibu
+  if (window.AppModule && window.AppModule.addIbuTransaction) {
+    window.AppModule.addIbuTransaction({
+      type: "expense",
+      unit: type === "gas" ? "gas" : "kost",
+      category: "🎁 Sedekah & Berbagi",
+      amount: nominalBiaya,
+      profit: 0,
+      note: keteranganLengkap,
+      date: txDate
+    });
+  }
+
+  return true;
+}
+
 window.IbuGasModule = {
   getGasInventory,
   saveGasInventory,
@@ -281,6 +326,7 @@ window.IbuGasModule = {
   getGasBonList,
   payGasBon,
   addGasBon,
+  recordIbuSocialGift,
   getTempoRecords,
   saveTempoRecords,
   addTempoRecord,

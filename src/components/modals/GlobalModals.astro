@@ -412,10 +412,82 @@
     </div>
   </div>
 
-  
-  
-  
-  
+  <!-- ================= MODAL: PENCATATAN BERBAGI / SEDEKAH USAHA IBU ================= -->
+  <div id="ibuSocialModal" class="modal-backdrop hidden">
+    <div class="modal-content space-y-4 max-w-sm">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🎁</span>
+          <div>
+            <h3 class="text-sm font-black text-slate-900">Berbagi & Sedekah Usaha Ibu</h3>
+            <p class="text-[10px] text-slate-500 font-medium">Pemberian ke Mbah, tetangga, atau lansia</p>
+          </div>
+        </div>
+        <button onclick="closeIbuSocialModal()" class="w-7 h-7 rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer">✕</button>
+      </div>
+
+      <!-- Pilihan Bentuk Pemberian -->
+      <div class="space-y-1.5">
+        <label class="text-[10.5px] font-bold text-slate-500 uppercase">Bentuk Pemberian:</label>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="flex items-center gap-2 p-2.5 rounded-xl border border-teal-200 bg-teal-50/60 cursor-pointer hover:bg-teal-100/60 transition-all">
+            <input type="radio" name="socialType" value="gas" checked onchange="toggleSocialGiftType()" class="text-teal-600 focus:ring-teal-500">
+            <div>
+              <div class="text-xs font-black text-teal-950">🍳 1 Tabung Gas</div>
+              <div class="text-[9.5px] text-teal-700 font-medium">Potong 1 gas isi</div>
+            </div>
+          </label>
+          <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-white cursor-pointer hover:bg-slate-50 transition-all">
+            <input type="radio" name="socialType" value="cash" onchange="toggleSocialGiftType()" class="text-teal-600 focus:ring-teal-500">
+            <div>
+              <div class="text-xs font-black text-slate-900">💵 Kas / Sembako</div>
+              <div class="text-[9.5px] text-slate-500 font-medium">Uang santunan</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Nama Penerima -->
+      <div class="space-y-1">
+        <label class="text-[10.5px] font-bold text-slate-500 uppercase">Nama Penerima:</label>
+        <input type="text" id="socialRecipient" placeholder="Misal: Mbah Nem, Bu RT, Tetangga samping..." class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none">
+      </div>
+
+      <!-- Tanggal & Nominal Biaya Modal -->
+      <div class="grid grid-cols-2 gap-2.5">
+        <div class="space-y-1">
+          <label class="text-[10.5px] font-bold text-slate-500 uppercase">Tanggal:</label>
+          <input type="date" id="socialDate" class="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none">
+        </div>
+        <div class="space-y-1">
+          <label class="text-[10.5px] font-bold text-slate-500 uppercase">Biaya / Modal (Rp):</label>
+          <input type="number" id="socialAmount" value="18500" class="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-black text-slate-900 outline-none">
+        </div>
+      </div>
+
+      <!-- Catatan / Niat -->
+      <div class="space-y-1">
+        <label class="text-[10.5px] font-bold text-slate-500 uppercase">Catatan / Keperluan:</label>
+        <input type="text" id="socialNote" placeholder="Misal: Sedekah jumat berkah, lansia kurang mampu..." class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 outline-none">
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-teal-50 border border-teal-200/70 text-[10.5px] text-teal-900 font-medium flex items-center gap-2">
+        <span>💡</span>
+        <span>Tercatat otomatis di Buku Kas Usaha Ibu sebagai pengeluaran amal tanpa merusak stok gas.</span>
+      </div>
+
+      <!-- Tombol Aksi -->
+      <div class="flex gap-2 pt-1">
+        <button onclick="closeIbuSocialModal()" class="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer">
+          Batal
+        </button>
+        <button onclick="submitIbuSocialGift()" class="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-black text-xs shadow-sm cursor-pointer">
+          Simpan Catatan Berkah ✨
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ================= MODAL: PINDAH SALDO (TRANSFER ANTAR DOMPET) ================= -->
   <div id="transferModal" class="modal-backdrop hidden">
     <div class="modal-content space-y-4 max-w-sm">

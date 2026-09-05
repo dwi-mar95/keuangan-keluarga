@@ -840,11 +840,26 @@ function renderIbuDashboard() {
   const elKostPending = document.getElementById("ibuKostPending");
   const elGasReady = document.getElementById("ibuGasReady");
   const elGasEmpty = document.getElementById("ibuGasEmpty");
+  const elSocialTotal = document.getElementById("ibuSocialTotal");
+  const elSocialCount = document.getElementById("ibuSocialCount");
 
   if (elKostReceived) elKostReceived.textContent = window.DateHelper.formatRupiah(kostSummary.totalReceived);
   if (elKostPending) elKostPending.textContent = window.DateHelper.formatRupiah(kostSummary.totalPending);
   if (elGasReady) elGasReady.textContent = `${gasInv.tabungIsi} Tabung`;
   if (elGasEmpty) elGasEmpty.textContent = `${gasInv.tabungKosong} Tabung`;
+
+  // Hitung total sedekah & berbagi Usaha Ibu bulan ini
+  const currentMonthWIB = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const socialTxs = txs.filter(t => {
+    const isSocial = (t.category && (t.category.includes("Sedekah") || t.category.includes("Berbagi"))) || 
+                     (t.note && (t.note.includes("Sedekah") || t.note.includes("Gratis") || t.note.includes("Bantuan") || t.note.includes("Mbah")));
+    const txMonth = (t.date || "").slice(0, 7);
+    return isSocial && (!txMonth || txMonth === currentMonthWIB);
+  });
+
+  const totalSocialAmount = socialTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+  if (elSocialTotal) elSocialTotal.textContent = window.DateHelper.formatRupiah(totalSocialAmount);
+  if (elSocialCount) elSocialCount.textContent = `${socialTxs.length} kali berbagi`;
 
   if (typeof renderIbuTransactionList === "function") {
     renderIbuTransactionList();

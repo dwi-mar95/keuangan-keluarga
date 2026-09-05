@@ -15,18 +15,22 @@
             Supplier Gas Resmi: <strong>Bu Yanto</strong> & <strong>Mas Aan</strong>
           </p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <button onclick="openIbuSocialModal()" class="px-3 py-1.5 rounded-xl bg-teal-50 border border-teal-300 hover:bg-teal-100 text-teal-900 font-extrabold text-xs cursor-pointer shadow-2xs flex items-center gap-1.5">
+            <span>🎁</span>
+            <span>Beri Mbah / Tetangga</span>
+          </button>
           <button onclick="openIbuSettingsModal()" class="px-3 py-1.5 rounded-xl bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 font-bold text-xs cursor-pointer shadow-2xs">
-            ⚙️ Atur / Kosongkan ke Rp 0
+            ⚙️ Atur Kas Ibu
           </button>
           <button onclick="openNewIbuTxModal()" class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs cursor-pointer shadow-sm">
-            + Catat Transaksi Ibu
+            + Catat Transaksi
           </button>
         </div>
       </div>
 
       <!-- KPI Usaha Ibu -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <div class="glass-card p-3.5 space-y-1">
           <div class="text-[10px] font-bold text-slate-400 uppercase">Sewa Kost Lunas</div>
           <div id="ibuKostReceived" class="text-lg font-black text-emerald-600">Rp 0</div>
@@ -49,6 +53,14 @@
           <div class="text-[10px] font-bold text-slate-400 uppercase">Tabung Gas Kosong</div>
           <div id="ibuGasEmpty" class="text-lg font-black text-slate-700">0 Tabung</div>
           <div class="text-[9px] text-slate-400 font-semibold">Siap kulakan supplier</div>
+        </div>
+
+        <div class="glass-card p-3.5 space-y-1 bg-teal-50/50 border-teal-200/80 col-span-2 sm:col-span-1">
+          <div class="text-[10px] font-extrabold text-teal-800 uppercase flex items-center gap-1">
+            <span>🎁</span> Sedekah / Berbagi
+          </div>
+          <div id="ibuSocialTotal" class="text-lg font-black text-teal-700">Rp 0</div>
+          <div id="ibuSocialCount" class="text-[9px] text-teal-600 font-semibold">0 kali berbagi</div>
         </div>
       </div>
 
@@ -76,11 +88,14 @@
 
         <!-- Kartu 2: Penjualan Gas Eceran & Buku Piutang/Tempo -->
         <div class="glass-card p-4 space-y-3">
-          <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2 flex-wrap gap-2">
             <h3 class="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
               🍳 Jual Gas LPG & Tempo
             </h3>
-            <div class="flex gap-1.5">
+            <div class="flex gap-1.5 flex-wrap">
+              <button onclick="openIbuSocialModal('gas')" class="px-2 py-0.5 rounded-md bg-teal-100 hover:bg-teal-200 text-[10px] font-bold text-teal-900 cursor-pointer" title="Beri Gas Gratis untuk Mbah / Tetangga">
+                🎁 Beri Gas
+              </button>
               <button onclick="openGasQuickModal('restock')" class="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-[10px] font-bold text-slate-700 cursor-pointer">
                 + Kulakan
               </button>
@@ -119,9 +134,10 @@
           <!-- Filter Cepat Unit Usaha -->
           <div class="flex items-center gap-1.5 text-xs">
             <select id="ibuTxFilterUnit" onchange="renderIbuTransactionList()" class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-[11px] font-bold text-slate-700 outline-none cursor-pointer">
-              <option value="all">Semua Unit (Kost & Gas)</option>
+              <option value="all">Semua Unit Usaha</option>
               <option value="kost">🏠 Khusus Kost</option>
               <option value="gas">🍳 Khusus Gas LPG</option>
+              <option value="social">🎁 Khusus Sedekah / Berbagi</option>
             </select>
           </div>
         </div>
