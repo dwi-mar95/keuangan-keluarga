@@ -11,6 +11,7 @@ const {
 
 // Build Timestamp Unik: Menjamin browser selalu memuat kode terbaru saat deploy baru tanpa perlu Hard Refresh (F5)
 const buildTime = Date.now();
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 ---
 
 <!DOCTYPE html>
@@ -26,9 +27,9 @@ const buildTime = Date.now();
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 
-  <link rel="manifest" href="/manifest.json">
+  <link rel="manifest" href={`${base}/manifest.json`}>
   <meta name="theme-color" content="#10b981">
-  <link rel="stylesheet" href={`/styles.css?v=${buildTime}`}>
+  <link rel="stylesheet" href={`${base}/styles.css?v=${buildTime}`}>
   
   <!-- Tailwind CSS CDN -->
   <script is:inline src="https://cdn.tailwindcss.com"></script>
@@ -44,39 +45,41 @@ const buildTime = Date.now();
   <slot />
 
   <!-- Core Client-Side Logic & Business Modules (Dengan Version Cache-Buster Otomatis) -->
-  <script is:inline src={`/ui-dialog.js?v=${buildTime}`}></script>
-  <script is:inline src={`/date-helper.js?v=${buildTime}`}></script>
-  <script is:inline src={`/categories.js?v=${buildTime}`}></script>
-  <script is:inline src={`/auth.js?v=${buildTime}`}></script>
-  <script is:inline src={`/settings.js?v=${buildTime}`}></script>
-  <script is:inline src={`/bills.js?v=${buildTime}`}></script>
-  <script is:inline src={`/goals.js?v=${buildTime}`}></script>
-  <script is:inline src={`/education.js?v=${buildTime}`}></script>
-  <script is:inline src={`/family-parents.js?v=${buildTime}`}></script>
-  <script is:inline src={`/vehicle-service.js?v=${buildTime}`}></script>
-  <script is:inline src={`/investments.js?v=${buildTime}`}></script>
-  <script is:inline src={`/ibu-gas.js?v=${buildTime}`}></script>
-  <script is:inline src={`/ibu-kost.js?v=${buildTime}`}></script>
-  <script is:inline src={`/monthly-stats.js?v=${buildTime}`}></script>
-  <script is:inline src={`/analytics-health.js?v=${buildTime}`}></script>
-  <script is:inline src={`/sync.js?v=${buildTime}`}></script>
-  <script is:inline src={`/app.js?v=${buildTime}`}></script>
-  <script is:inline src={`/whatsapp.js?v=${buildTime}`}></script>
-  <script is:inline src={`/export-reports.js?v=${buildTime}`}></script>
-  <script is:inline src={`/ocr.js?v=${buildTime}`}></script>
-  <script is:inline src={`/shopping-list.js?v=${buildTime}`}></script>
-  <script is:inline src={`/backup-restore.js?v=${buildTime}`}></script>
-  <script is:inline src={`/community.js?v=${buildTime}`}></script>
-  <script is:inline src={`/taxes-holidays.js?v=${buildTime}`}></script>
-  <script is:inline src={`/kondangan-social.js?v=${buildTime}`}></script>
-  <script is:inline src={`/emergency-fund.js?v=${buildTime}`}></script>
-  <script is:inline src={`/page-controller.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/ui-dialog.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/date-helper.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/categories.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/auth.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/settings.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/bills.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/goals.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/education.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/family-parents.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/vehicle-service.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/investments.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/ibu-gas.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/ibu-kost.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/monthly-stats.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/analytics-health.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/sync.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/app.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/whatsapp.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/export-reports.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/ocr.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/shopping-list.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/backup-restore.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/community.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/taxes-holidays.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/kondangan-social.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/emergency-fund.js?v=${buildTime}`}></script>
+  <script is:inline src={`${base}/page-controller.js?v=${buildTime}`}></script>
 
   <!-- PWA Service Worker Registration: Auto-Update & Auto-Reload Saat Ada Versi Baru -->
-  <script is:inline define:vars={{ buildTime }}>
+  <script is:inline define:vars={{ buildTime, base }}>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js?v=' + buildTime).then(reg => {
+        const swUrl = (base ? base : '') + '/sw.js?v=' + buildTime;
+        const swScope = (base ? base : '') + '/';
+        navigator.serviceWorker.register(swUrl, { scope: swScope }).then(reg => {
           // Paksa periksa update ke server setiap kali aplikasi dibuka
           reg.update();
 
