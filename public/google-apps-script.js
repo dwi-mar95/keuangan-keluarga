@@ -455,11 +455,19 @@ function handleSingleSyncItem(ss, item) {
     }
   }
 
-  // 13. RESET TOTAL TRANSAKSI KELUARGA KE RP 0 (DI SPREADSHEET)
-  else if (action === "reset_keluarga_data") {
+  // 13. RESET TOTAL TRANSAKSI KELUARGA & USAHA IBU KE RP 0 (DI SPREADSHEET)
+  else if (action === "reset_keluarga_data" || action === "reset_all_data") {
     const sKel = getSheetSafe(ss, "Keluarga_Transaksi");
     if (sKel && sKel.getLastRow() > 1) {
       sKel.deleteRows(2, sKel.getLastRow() - 1);
+    }
+    const sIbu = getSheetSafe(ss, "Usaha_Ibu_Transaksi");
+    if (sIbu && sIbu.getLastRow() > 1) {
+      sIbu.deleteRows(2, sIbu.getLastRow() - 1);
+    }
+    const sTempo = getSheetSafe(ss, "Usaha_Ibu_Tempo");
+    if (sTempo && sTempo.getLastRow() > 1) {
+      sTempo.deleteRows(2, sTempo.getLastRow() - 1);
     }
   }
 

@@ -3543,17 +3543,28 @@
     // Atur Saldo Dompet & Reset Data ke Rp 0
     function handleResetAllDataToZero() {
       closeSettingsModal();
-      showConfirm("Kosongkan Semua Data?", "Apakah Anda yakin ingin <strong>menghapus semua data demo</strong> dan mengosongkan saldo menjadi <strong>Rp 0</strong>?<br><br>Semua riwayat transaksi akan dihapus bersih agar Anda bisa mulai mencatat dari nol.", { type: "danger", confirmText: "Ya, Mulai dari Rp 0" }).then(confirmed => {
+      showConfirm("Kosongkan Semua Data?", "Apakah Anda yakin ingin <strong>menghapus semua riwayat transaksi</strong> dan mengosongkan saldo menjadi <strong>Rp 0</strong>?<br><br>Semua riwayat transaksi keluarga & usaha ibu di HP dan Google Spreadsheet akan dihapus bersih agar Anda bisa mulai mencatat dari nol.", { type: "danger", confirmText: "Ya, Mulai dari Rp 0" }).then(async confirmed => {
         if (confirmed) {
           window.AppModule.resetAllDataToZero();
           localStorage.setItem("usaha_ibu_gas_bon_pelanggan", JSON.stringify([]));
+          localStorage.setItem("usaha_ibu_tempo_records", JSON.stringify([]));
+          if (window.SyncModule && window.SyncModule.clearDeletedIds) {
+            window.SyncModule.clearDeletedIds();
+          }
           const rk = window.IbuKostModule.getKostRooms();
           rk.forEach(r => { if (r.statusBulanIni === "paid") r.statusBulanIni = "unpaid"; });
           window.IbuKostModule.saveKostRooms(rk);
           renderIbuKostList();
           renderIbuGasBonList();
+
+          // Kirim perintah reset total ke Google Spreadsheet
+          if (window.SyncModule && window.SyncModule.pushTransactionToSyncQueue) {
+            window.SyncModule.pushTransactionToSyncQueue("reset_all_data", {});
+            await window.SyncModule.processPendingQueue();
+          }
+
           closeSettingsModal();
-          showToast("Seluruh data berhasil dikosongkan ke Rp 0! ✨", "success");
+          showToast("Seluruh data di HP & Google Spreadsheet berhasil dikosongkan ke Rp 0! ✨", "success");
         }
       });
     }

@@ -245,6 +245,10 @@ function deleteTempoRecord(tempoId) {
   records = records.filter(r => r.id !== tempoId);
   saveTempoRecords(records);
 
+  if (window.SyncModule && window.SyncModule.markIdAsDeleted) {
+    window.SyncModule.markIdAsDeleted(tempoId);
+  }
+
   // Sinkronkan ke Google Spreadsheet
   if (window.SyncModule && window.SyncModule.pushTransactionToSyncQueue) {
     window.SyncModule.pushTransactionToSyncQueue("delete_ibu_tempo", { id: tempoId });

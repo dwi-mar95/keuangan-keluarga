@@ -5,6 +5,28 @@
 
 const SYNC_URL_KEY = "keuangan_keluarga_spreadsheet_api_url";
 const PENDING_QUEUE_KEY = "keuangan_keluarga_pending_sync_queue";
+const DELETED_IDS_KEY = "keuangan_keluarga_deleted_ids";
+
+function getDeletedIds() {
+  try {
+    const saved = localStorage.getItem(DELETED_IDS_KEY);
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  } catch (e) {
+    return new Set();
+  }
+}
+
+function markIdAsDeleted(id) {
+  if (!id) return;
+  const ids = getDeletedIds();
+  ids.add(String(id));
+  const arr = Array.from(ids).slice(-300);
+  localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(arr));
+}
+
+function clearDeletedIds() {
+  localStorage.removeItem(DELETED_IDS_KEY);
+}
 
 function getSpreadsheetApiUrl() {
   return localStorage.getItem(SYNC_URL_KEY) || "https://script.google.com/macros/s/AKfycbyB7_urRr_uBMeF6_n18p-ia1XwrRVgtiHmVs1gyV2NTU7OxTLAQXyQQNo_T5ETDdkH/exec";
@@ -196,12 +218,13 @@ async function pullFromSpreadsheet(force = false) {
   try {
     if (force && window.showToast) window.showToast("Menyelaraskan data dari Google Sheets... 🔄", "info");
 
-    const cacheBuster = `&_t=${Date.now()}${force ? '&force=true&nocache=true' : ''}`;
+    const cacheBuster = `&_t=${Date.now()}&nocache=true${force ? '&force=true' : ''}`;
     const res = await fetch(apiUrl + "?action=fetch_all" + cacheBuster);
     const data = await res.json();
 
     if (data && data.status === "success") {
       let updatedCount = 0;
+      const deletedIds = getDeletedIds();
 
       // 1. Sinkronisasi Transaksi Keluarga (Dengan Smart Merge Anti-Revert)
       if (Array.isArray(data.keluarga_txs)) {
@@ -224,20 +247,24 @@ async function pullFromSpreadsheet(force = false) {
           wallet: r["Dompet/Akun"] || "Kas Tunai",
           user: (r["Pencatat"] || "").toLowerCase().includes("umma") || (r["Pencatat"] || "").toLowerCase().includes("istri") ? "istri" : "suami",
           note: r["Keterangan"] || ""
-        })).filter(r => !pendingDeletedKeluargaIds.has(r.id)); // Jangan bawa kembali transaksi yang baru saja dihapus!
+        })).filter(r => !pendingDeletedKeluargaIds.has(r.id) && !deletedIds.has(r.id)); // Jangan pernah bawa kembali transaksi yang telah dihapus!
 
-        // Pertahankan editan lokal yang masih ada di antrean sync
+        // Pertahankan editan lokal yang masih ada di antrean sync atau baru diedit
         const finalKeluarga = mapped.map(remote => {
           if (pendingKeluargaIds.has(remote.id)) {
             const localMatch = localTxs.find(l => l.id === remote.id);
             return localMatch || remote;
+          }
+          const localMatch = localTxs.find(l => l.id === remote.id);
+          if (localMatch && localMatch.updatedAt && (Date.now() - localMatch.updatedAt < 3600000)) {
+            return localMatch;
           }
           return remote;
         });
 
         // Tambahkan item lokal yang baru dibuat offline dan belum tercatat di spreadsheet
         localTxs.forEach(localItem => {
-          if (!pendingDeletedKeluargaIds.has(localItem.id) && !finalKeluarga.some(f => f.id === localItem.id)) {
+          if (!pendingDeletedKeluargaIds.has(localItem.id) && !deletedIds.has(localItem.id) && !finalKeluarga.some(f => f.id === localItem.id)) {
             finalKeluarga.unshift(localItem);
           }
         });
@@ -272,7 +299,7 @@ async function pullFromSpreadsheet(force = false) {
           amount: Number(r["Nominal (Rp)"]) || 0,
           profit: Number(r["Laba Bersih (Rp)"]) || 0,
           note: r["Keterangan"] || ""
-        })).filter(r => !pendingDeletedIbuIds.has(r.id)); // Jangan bawa kembali transaksi ibu yang sudah dihapus
+        })).filter(r => !pendingDeletedIbuIds.has(r.id) && !deletedIds.has(r.id)); // Jangan bawa kembali transaksi ibu yang sudah dihapus
 
         // Smart Merge: Jika item baru saja diedit di antrean lokal, JANGAN TIMPA dengan data lama server
         const finalIbu = mappedIbu.map(remoteItem => {
@@ -280,12 +307,16 @@ async function pullFromSpreadsheet(force = false) {
             const localMatch = localIbu.find(l => l.id === remoteItem.id);
             return localMatch || remoteItem;
           }
+          const localMatch = localIbu.find(l => l.id === remoteItem.id);
+          if (localMatch && localMatch.updatedAt && (Date.now() - localMatch.updatedAt < 3600000)) {
+            return localMatch;
+          }
           return remoteItem;
         });
 
         // Tambahkan item lokal yang baru dibuat offline dan belum tercatat di spreadsheet
         localIbu.forEach(localItem => {
-          if (!pendingDeletedIbuIds.has(localItem.id) && !finalIbu.some(f => f.id === localItem.id)) {
+          if (!pendingDeletedIbuIds.has(localItem.id) && !deletedIds.has(localItem.id) && !finalIbu.some(f => f.id === localItem.id)) {
             finalIbu.unshift(localItem);
           }
         });
@@ -294,6 +325,7 @@ async function pullFromSpreadsheet(force = false) {
         finalIbu.sort((a, b) => new Date(b.date) - new Date(a.date));
 
         localStorage.setItem("keuangan_keluarga_ibu_transactions", JSON.stringify(finalIbu));
+        localStorage.setItem("usaha_ibu_transactions", JSON.stringify(finalIbu));
         if (window.AppModule && window.AppModule.saveIbuTransactions) {
           window.AppModule.saveIbuTransactions(finalIbu);
         }
@@ -550,5 +582,8 @@ window.SyncModule = {
   processPendingQueue,
   pullFromSpreadsheet,
   parseSpreadsheetDateToISO,
-  syncNow
+  syncNow,
+  markIdAsDeleted,
+  clearDeletedIds,
+  getDeletedIds
 };

@@ -121,6 +121,10 @@ function deleteIbuTransaction(id) {
   txs = txs.filter(t => t.id !== id);
   saveIbuTransactions(txs);
 
+  if (window.SyncModule && window.SyncModule.markIdAsDeleted) {
+    window.SyncModule.markIdAsDeleted(id);
+  }
+
   if (window.SyncModule && window.SyncModule.pushTransactionToSyncQueue) {
     window.SyncModule.pushTransactionToSyncQueue("delete_ibu_tx", { id });
   }
@@ -140,7 +144,8 @@ function updateIbuTransaction(id, updatedData) {
 
   txs[index] = {
     ...txs[index],
-    ...updatedData
+    ...updatedData,
+    updatedAt: Date.now()
   };
 
   // Urutkan berdasarkan tanggal terbaru
@@ -878,7 +883,8 @@ function updateTransaction(id, updatedData) {
 
   txs[index] = {
     ...txs[index],
-    ...updatedData
+    ...updatedData,
+    updatedAt: Date.now()
   };
 
   // Urutkan transaksi berdasarkan tanggal terbaru (mendukung Backdate)
@@ -901,6 +907,10 @@ function deleteTransaction(id) {
 
   txs = txs.filter(t => t.id !== id);
   saveKeluargaTransactions(txs);
+
+  if (window.SyncModule && window.SyncModule.markIdAsDeleted) {
+    window.SyncModule.markIdAsDeleted(id);
+  }
 
   if (window.SyncModule) {
     window.SyncModule.pushTransactionToSyncQueue("delete_keluarga_tx", { id });
