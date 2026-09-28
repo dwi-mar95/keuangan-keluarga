@@ -149,49 +149,32 @@ const MIN_PULL_INTERVAL = 30000; // 30 detik interval minimal auto-pull di backg
 
 // Helper: Parsing tanggal dari Google Spreadsheet agar tanggal riil transaksi masa lalu tetap utuh presisi dalam WIB (UTC+7)
 function parseSpreadsheetDateToISO(raw) {
-  if (!raw) return new Date().toISOString();
+  if (!raw) return (window.DateHelper ? window.DateHelper.getNowWIBISOString() : new Date().toISOString());
+  if (window.DateHelper && window.DateHelper.toWIBISOString) {
+    return window.DateHelper.toWIBISOString(raw);
+  }
   
   if (typeof raw === "string") {
-    raw = raw.trim();
-    // 1. Format ISO dengan T (misal: 2026-09-04T12:00:00+07:00)
-    if (raw.includes("T")) {
-      if (raw.includes("+07:00")) return raw;
-      const d = new Date(raw);
-      if (!isNaN(d.getTime())) {
-        // Konversi aman ke ISO string
-        return d.toISOString();
-      }
+    const s = raw.trim();
+    if (s.includes("T") && s.includes("+07:00")) return s;
+    const isoMatch = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})(?:[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+    if (isoMatch) {
+      const h = (isoMatch[4] || "12").padStart(2, "0");
+      const m = (isoMatch[5] || "00").padStart(2, "0");
+      const sec = (isoMatch[6] || "00").padStart(2, "0");
+      return `${isoMatch[1]}-${isoMatch[2].padStart(2, "0")}-${isoMatch[3].padStart(2, "0")}T${h}:${m}:${sec}+07:00`;
     }
-    
-    // 2. Format YYYY-MM-DD HH:mm:ss atau YYYY-MM-DD (Standar Google Sheets WIB)
-    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
-      const parts = raw.split(" ");
-      const datePart = parts[0];
-      const timeStr = parts[1] || "12:00:00";
-      // Pertahankan tanggal persis dalam zona WIB (+07:00)
-      return `${datePart}T${timeStr}+07:00`;
-    }
-    
-    // 3. Format DD/MM/YYYY atau YYYY/MM/DD
-    if (raw.includes("/")) {
-      const parts = raw.split(" ");
-      const dateParts = parts[0].split("/");
-      const timeStr = parts[1] || "12:00:00";
-      
-      if (dateParts.length === 3) {
-        if (dateParts[0].length === 4) {
-          // YYYY/MM/DD
-          return `${dateParts[0]}-${dateParts[1].padStart(2, "0")}-${dateParts[2].padStart(2, "0")}T${timeStr}+07:00`;
-        } else if (dateParts[2].length === 4) {
-          // DD/MM/YYYY baku Indonesia
-          return `${dateParts[2]}-${dateParts[1].padStart(2, "0")}-${dateParts[0].padStart(2, "0")}T${timeStr}+07:00`;
-        }
-      }
+    const dmyMatch = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})(?:[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+    if (dmyMatch) {
+      const h = (dmyMatch[4] || "12").padStart(2, "0");
+      const m = (dmyMatch[5] || "00").padStart(2, "0");
+      const sec = (dmyMatch[6] || "00").padStart(2, "0");
+      return `${dmyMatch[3]}-${dmyMatch[2].padStart(2, "0")}-${dmyMatch[1].padStart(2, "0")}T${h}:${m}:${sec}+07:00`;
     }
   }
   
   const d = new Date(raw);
-  return !isNaN(d.getTime()) ? d.toISOString() : new Date().toISOString();
+  return !isNaN(d.getTime()) ? d.toISOString() : (window.DateHelper ? window.DateHelper.getNowWIBISOString() : new Date().toISOString());
 }
 
 // Tarik data terbaru dari Google Spreadsheet ke HP (GET Two-Way Sync High Speed dengan Smart Anti-Revert)
@@ -237,7 +220,9 @@ async function pullFromSpreadsheet(force = false) {
 
       // 1. Sinkronisasi Transaksi Keluarga (Dengan Smart Merge Anti-Revert)
       if (Array.isArray(data.keluarga_txs)) {
-        const localTxs = (window.AppModule && window.AppModule.getTransactions) ? window.AppModule.getTransactions() : [];
+        const localTxs = (window.AppModule && window.AppModule.getKeluargaTransactions) 
+          ? window.AppModule.getKeluargaTransactions() 
+          : ((window.AppModule && window.AppModule.getTransactions) ? window.AppModule.getTransactions() : []);
         const pendingQueue = getPendingQueue();
         const pendingKeluargaIds = new Set(
           pendingQueue.filter(item => item.action && (item.action.includes("keluarga_tx") || item.action === "add_keluarga_tx" || item.action === "update_keluarga_tx") && item.payload && item.payload.id).map(item => item.payload.id)
@@ -258,20 +243,20 @@ async function pullFromSpreadsheet(force = false) {
           note: r["Keterangan"] || ""
         })).filter(r => !pendingDeletedKeluargaIds.has(r.id) && !deletedIds.has(r.id)); // Jangan pernah bawa kembali transaksi yang telah dihapus!
 
-        // Pertahankan editan lokal yang masih ada di antrean sync atau baru diedit
+        // Pertahankan editan lokal yang masih ada di antrean sync atau baru dibuat/diedit dalam 24 jam terakhir
         const finalKeluarga = mapped.map(remote => {
           if (pendingKeluargaIds.has(remote.id)) {
             const localMatch = localTxs.find(l => l.id === remote.id);
             return localMatch || remote;
           }
           const localMatch = localTxs.find(l => l.id === remote.id);
-          if (localMatch && localMatch.updatedAt && (Date.now() - localMatch.updatedAt < 3600000)) {
+          if (localMatch && localMatch.updatedAt && (Date.now() - localMatch.updatedAt < 86400000)) {
             return localMatch;
           }
           return remote;
         });
 
-        // Tambahkan item lokal yang baru dibuat offline dan belum tercatat di spreadsheet
+        // Tambahkan item lokal yang baru dibuat offline/realtime dan belum tercatat di spreadsheet
         localTxs.forEach(localItem => {
           if (!pendingDeletedKeluargaIds.has(localItem.id) && !deletedIds.has(localItem.id) && !finalKeluarga.some(f => f.id === localItem.id)) {
             finalKeluarga.unshift(localItem);
@@ -310,14 +295,14 @@ async function pullFromSpreadsheet(force = false) {
           note: r["Keterangan"] || ""
         })).filter(r => !pendingDeletedIbuIds.has(r.id) && !deletedIds.has(r.id)); // Jangan bawa kembali transaksi ibu yang sudah dihapus
 
-        // Smart Merge: Jika item baru saja diedit di antrean lokal, JANGAN TIMPA dengan data lama server
+        // Smart Merge: Jika item baru saja diedit di antrean lokal atau dalam 24 jam terakhir, JANGAN TIMPA dengan data lama server
         const finalIbu = mappedIbu.map(remoteItem => {
           if (pendingIbuIds.has(remoteItem.id)) {
             const localMatch = localIbu.find(l => l.id === remoteItem.id);
             return localMatch || remoteItem;
           }
           const localMatch = localIbu.find(l => l.id === remoteItem.id);
-          if (localMatch && localMatch.updatedAt && (Date.now() - localMatch.updatedAt < 3600000)) {
+          if (localMatch && localMatch.updatedAt && (Date.now() - localMatch.updatedAt < 86400000)) {
             return localMatch;
           }
           return remoteItem;
@@ -328,6 +313,18 @@ async function pullFromSpreadsheet(force = false) {
           if (!pendingDeletedIbuIds.has(localItem.id) && !deletedIds.has(localItem.id) && !finalIbu.some(f => f.id === localItem.id)) {
             finalIbu.unshift(localItem);
           }
+        });
+
+        // Urutkan tanggal terbaru
+        finalIbu.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        localStorage.setItem("keuangan_keluarga_ibu_transactions", JSON.stringify(finalIbu));
+        localStorage.setItem("usaha_ibu_transactions", JSON.stringify(finalIbu));
+        if (window.AppModule && window.AppModule.saveIbuTransactions) {
+          window.AppModule.saveIbuTransactions(finalIbu);
+        }
+        updatedCount++;
+      }
         });
 
         // Urutkan tanggal terbaru

@@ -68,11 +68,16 @@ function saveIbuTransactions(txs) {
 // Tambah Transaksi Keluarga (Optimistic Update)
 function addTransaction(tx) {
   const txs = getKeluargaTransactions();
+  const txDate = tx.date 
+    ? (window.DateHelper ? window.DateHelper.toWIBISOString(tx.date) : tx.date)
+    : (window.DateHelper ? window.DateHelper.getNowWIBISOString() : new Date().toISOString());
+
   const newTx = {
     id: "tx_" + Date.now(),
-    date: tx.date || new Date().toISOString(),
     user: tx.user || (window.AuthModule ? window.AuthModule.getActiveProfile() : "suami"),
-    ...tx
+    ...tx,
+    date: txDate,
+    updatedAt: Date.now()
   };
   txs.unshift(newTx);
   txs.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -94,12 +99,18 @@ function addTransaction(tx) {
 // Tambah Transaksi Usaha Ibu
 function addIbuTransaction(tx) {
   const txs = getIbuTransactions();
+  const txDate = tx.date 
+    ? (window.DateHelper ? window.DateHelper.toWIBISOString(tx.date) : tx.date)
+    : (window.DateHelper ? window.DateHelper.getNowWIBISOString() : new Date().toISOString());
+
   const newTx = {
     id: "ib_" + Date.now(),
-    date: tx.date || new Date().toISOString(),
-    ...tx
+    ...tx,
+    date: txDate,
+    updatedAt: Date.now()
   };
   txs.unshift(newTx);
+  txs.sort((a, b) => new Date(b.date) - new Date(a.date));
   saveIbuTransactions(txs);
 
   if (window.SettingsModule) window.SettingsModule.playSuccessSound();
@@ -109,6 +120,9 @@ function addIbuTransaction(tx) {
   }
 
   renderIbuDashboard();
+  if (typeof renderIbuTransactionList === "function") {
+    renderIbuTransactionList();
+  }
   return newTx;
 }
 
@@ -142,9 +156,14 @@ function updateIbuTransaction(id, updatedData) {
   const index = txs.findIndex(t => t.id === id);
   if (index === -1) return false;
 
+  const txDate = updatedData.date 
+    ? (window.DateHelper ? window.DateHelper.toWIBISOString(updatedData.date) : updatedData.date)
+    : txs[index].date;
+
   txs[index] = {
     ...txs[index],
     ...updatedData,
+    date: txDate,
     updatedAt: Date.now()
   };
 
@@ -193,10 +212,16 @@ function calculateKeluargaMetrics() {
   }
 
   if (startDate) {
-    filtered = filtered.filter(t => (t.date || "").split("T")[0] >= startDate);
+    filtered = filtered.filter(t => {
+      const d = window.DateHelper ? window.DateHelper.toInputDateFormat(t.date) : (t.date || "").split("T")[0];
+      return d >= startDate;
+    });
   }
   if (endDate) {
-    filtered = filtered.filter(t => (t.date || "").split("T")[0] <= endDate);
+    filtered = filtered.filter(t => {
+      const d = window.DateHelper ? window.DateHelper.toInputDateFormat(t.date) : (t.date || "").split("T")[0];
+      return d <= endDate;
+    });
   }
   if (filterType && filterType !== "all") {
     filtered = filtered.filter(t => t.type === filterType);
@@ -881,9 +906,14 @@ function updateTransaction(id, updatedData) {
   const index = txs.findIndex(t => t.id === id);
   if (index === -1) return false;
 
+  const txDate = updatedData.date 
+    ? (window.DateHelper ? window.DateHelper.toWIBISOString(updatedData.date) : updatedData.date)
+    : txs[index].date;
+
   txs[index] = {
     ...txs[index],
     ...updatedData,
+    date: txDate,
     updatedAt: Date.now()
   };
 
@@ -1245,6 +1275,7 @@ function transferBetweenWallets(fromWalletName, toWalletName, amount, note = "")
 window.AppModule = {
   AppState,
   getKeluargaTransactions,
+  getTransactions: getKeluargaTransactions,
   saveKeluargaTransactions,
   getIbuTransactions,
   saveIbuTransactions,

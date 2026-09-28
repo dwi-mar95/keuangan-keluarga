@@ -126,8 +126,12 @@ function recordRoomPayment(roomId, { amount, paymentDate, isPartial = false, par
   const room = rooms.find(r => r.id === roomId);
   if (!room) return false;
 
-  const actualDate = paymentDate ? paymentDate + "T12:00:00+07:00" : new Date().toISOString();
-  const dateStrOnly = paymentDate || (window.DateHelper ? window.DateHelper.getTodayWIBString() : new Date().toISOString().split("T")[0]);
+  const actualDate = window.DateHelper && window.DateHelper.toWIBISOString ?
+    window.DateHelper.toWIBISOString(paymentDate) :
+    (paymentDate ? paymentDate + "T12:00:00+07:00" : new Date().toISOString());
+  const dateStrOnly = window.DateHelper && window.DateHelper.toInputDateFormat ?
+    window.DateHelper.toInputDateFormat(actualDate) :
+    (paymentDate || (window.DateHelper ? window.DateHelper.getTodayWIBString() : new Date().toISOString().split("T")[0]));
 
   const numMonths = Number(paidMonths) || Math.max(1, Math.round(Number(amount) / (room.monthlyRent || 1)));
 

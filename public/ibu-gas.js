@@ -43,7 +43,9 @@ function recordGasRestock(supplierId, qty, modalPerTabung, isPaid = true, custom
   const inv = getGasInventory();
   const supplier = inv.suppliers.find(s => s.id === supplierId) || { name: supplierId };
   const totalCost = Number(qty) * Number(modalPerTabung);
-  const txDate = customDate ? customDate + "T12:00:00+07:00" : new Date().toISOString();
+  const txDate = window.DateHelper && window.DateHelper.toWIBISOString ?
+    window.DateHelper.toWIBISOString(customDate) :
+    (customDate ? customDate + "T12:00:00+07:00" : new Date().toISOString());
 
   // Update stok: tabung kosong berkurang, tabung isi bertambah
   inv.tabungKosong = Math.max(0, inv.tabungKosong - Number(qty));
@@ -104,8 +106,12 @@ function recordGasSale(qty, hargaJual, customerName = "Pembeli Umum", isBon = fa
   const totalOmset = count * Number(hargaJual);
   const totalModal = count * hargaModal;
   const totalLaba = totalOmset - totalModal;
-  const txDate = customDate ? customDate + "T12:00:00+07:00" : new Date().toISOString();
-  const dateStr = customDate || new Date().toISOString().split("T")[0];
+  const txDate = window.DateHelper && window.DateHelper.toWIBISOString ?
+    window.DateHelper.toWIBISOString(customDate) :
+    (customDate ? customDate + "T12:00:00+07:00" : new Date().toISOString());
+  const dateStr = window.DateHelper && window.DateHelper.toInputDateFormat ?
+    window.DateHelper.toInputDateFormat(txDate) :
+    (customDate || new Date().toISOString().split("T")[0]);
 
   // Update stok: tabung isi berkurang, tabung kosong bertambah
   inv.tabungIsi -= count;
@@ -206,7 +212,9 @@ function payTempoRecord(tempoId, payDate = null) {
   saveTempoRecords(records);
 
   // Catat otomatis ke Kas Usaha Ibu
-  const actualDate = payDate ? payDate + "T12:00:00+07:00" : new Date().toISOString();
+  const actualDate = window.DateHelper && window.DateHelper.toWIBISOString ?
+    window.DateHelper.toWIBISOString(payDate) :
+    (payDate ? payDate + "T12:00:00+07:00" : new Date().toISOString());
   if (window.AppModule && window.AppModule.addIbuTransaction) {
     if (item.type === "supplier_debt") {
       // Pembayaran hutang kulakan = Pengeluaran
@@ -280,7 +288,9 @@ function addGasBon(customerName, qty, amount) {
 // Terintegrasi ke Kas Usaha Ibu & Pengurangan Stok Gas Otomatis (100% Sesuai Skema 11 Sheet)
 function recordIbuSocialGift({ type = "gas", recipient = "Mbah / Tetangga", amount = 0, note = "", date = null }) {
   const inv = getGasInventory();
-  const txDate = date ? date + "T12:00:00+07:00" : new Date().toISOString();
+  const txDate = window.DateHelper && window.DateHelper.toWIBISOString ?
+    window.DateHelper.toWIBISOString(date) :
+    (date ? date + "T12:00:00+07:00" : new Date().toISOString());
   let nominalBiaya = Number(amount) || 0;
   let keteranganLengkap = "";
 

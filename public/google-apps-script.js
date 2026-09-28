@@ -199,6 +199,53 @@ function doPost(e) {
   }
 }
 
+// Helper: Parsing tanggal presisi WIB (Mendukung format ISO T, space-separated, slash DD/MM/YYYY, dan backdate)
+function parseDateWIB(dateVal, fallbackTimestamp) {
+  if (!dateVal && fallbackTimestamp) dateVal = fallbackTimestamp;
+  if (!dateVal) return new Date();
+
+  if (dateVal instanceof Date) {
+    return isNaN(dateVal.getTime()) ? new Date() : dateVal;
+  }
+
+  if (typeof dateVal === "number") {
+    return new Date(dateVal);
+  }
+
+  if (typeof dateVal === "string") {
+    const s = dateVal.trim();
+    
+    // Pattern 1: YYYY-MM-DD or YYYY/MM/DD dengan opsi jam
+    const isoMatch = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})(?:[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+    if (isoMatch) {
+      const year = parseInt(isoMatch[1], 10);
+      const month = parseInt(isoMatch[2], 10) - 1;
+      const day = parseInt(isoMatch[3], 10);
+      const hour = isoMatch[4] !== undefined ? parseInt(isoMatch[4], 10) : 12;
+      const min = isoMatch[5] !== undefined ? parseInt(isoMatch[5], 10) : 0;
+      const sec = isoMatch[6] !== undefined ? parseInt(isoMatch[6], 10) : 0;
+      return new Date(Date.UTC(year, month, day, hour - 7, min, sec));
+    }
+    
+    // Pattern 2: DD/MM/YYYY or DD-MM-YYYY dengan opsi jam
+    const dmyMatch = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})(?:[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+    if (dmyMatch) {
+      const day = parseInt(dmyMatch[1], 10);
+      const month = parseInt(dmyMatch[2], 10) - 1;
+      const year = parseInt(dmyMatch[3], 10);
+      const hour = dmyMatch[4] !== undefined ? parseInt(dmyMatch[4], 10) : 12;
+      const min = dmyMatch[5] !== undefined ? parseInt(dmyMatch[5], 10) : 0;
+      const sec = dmyMatch[6] !== undefined ? parseInt(dmyMatch[6], 10) : 0;
+      return new Date(Date.UTC(year, month, day, hour - 7, min, sec));
+    }
+
+    const parsed = new Date(s);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+
+  return new Date();
+}
+
 // ================= DISPATCHER TINDAKAN SINKRONISASI =================
 function handleSingleSyncItem(ss, item) {
   const action = item.action;
@@ -206,19 +253,7 @@ function handleSingleSyncItem(ss, item) {
   if (!p) return;
 
   // Parsing tanggal presisi WIB (Mendukung format ISO T, space-separated, dan backdate)
-  let tglObj;
-  if (p.date) {
-    if (typeof p.date === "string" && p.date.includes(" ") && !p.date.includes("T")) {
-      const parts = p.date.trim().split(" ");
-      tglObj = new Date(`${parts[0]}T${parts[1] || '12:00:00'}+07:00`);
-    } else {
-      tglObj = new Date(p.date);
-    }
-  } else {
-    tglObj = new Date(item.timestamp || new Date());
-  }
-  if (isNaN(tglObj.getTime())) tglObj = new Date();
-
+  const tglObj = parseDateWIB(p.date, item.timestamp);
   // Gunakan format standar universal yyyy-MM-dd HH:mm:ss agar TIDAK PERNAH tertukar tanggal & bulan di locale spreadsheet manapun
   const formattedDateWIB = Utilities.formatDate(tglObj, "Asia/Jakarta", "yyyy-MM-dd HH:mm:ss");
 

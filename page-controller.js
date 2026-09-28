@@ -613,7 +613,9 @@
         return;
       }
 
-      const txDate = dateVal ? dateVal + "T12:00:00+07:00" : new Date().toISOString();
+      const txDate = window.DateHelper && window.DateHelper.toWIBISOString ?
+        window.DateHelper.toWIBISOString(dateVal) :
+        (dateVal ? dateVal + "T12:00:00+07:00" : new Date().toISOString());
 
       if (type === "kost_income") {
         window.AppModule.addIbuTransaction({
@@ -638,32 +640,12 @@
       } else if (type === "gas_sale") {
         const modalPerTabung = 18500;
         const hargaJualPerTabung = amount / qty;
-        const profitTotal = (hargaJualPerTabung - modalPerTabung) * qty;
-
-        window.IbuGasModule.recordGasSale(qty, hargaJualPerTabung, note || "Pembeli Warung", false);
-        window.AppModule.addIbuTransaction({
-          unit: "gas",
-          type: "income",
-          category: `Jual ${qty} Tabung Gas`,
-          amount: amount,
-          profit: profitTotal > 0 ? profitTotal : 3500 * qty,
-          note: note || `Penjualan ${qty} tabung gas eceran`,
-          date: txDate
-        });
+        // recordGasSale secara otomatis mengupdate inventaris dan mencatat ke kas Usaha Ibu sekali saja
+        window.IbuGasModule.recordGasSale(qty, hargaJualPerTabung, note || "Pembeli Warung", false, dateVal);
       } else if (type === "gas_restock_yanto" || type === "gas_restock_aan") {
         const isAan = type === "gas_restock_aan";
-        const supplierName = isAan ? "Mas Aan" : "Bu Yanto";
-
-        window.IbuGasModule.recordGasRestock(isAan ? "mas_aan" : "bu_yanto", qty, amount / qty, true);
-        window.AppModule.addIbuTransaction({
-          unit: "gas",
-          type: "expense",
-          category: `Kulakan ${qty} Tabung (${supplierName})`,
-          amount: amount,
-          profit: 0,
-          note: note || `Kulakan ${qty} tabung gas supplier ${supplierName}`,
-          date: txDate
-        });
+        // recordGasRestock secara otomatis mengupdate inventaris dan mencatat ke kas Usaha Ibu sekali saja
+        window.IbuGasModule.recordGasRestock(isAan ? "mas_aan" : "bu_yanto", qty, amount / qty, true, dateVal);
       } else if (type === "gas_bon") {
         window.IbuGasModule.addGasBon(note || "Tetangga", qty, amount);
       }
@@ -1037,11 +1019,9 @@
         return;
       }
 
-      let txTime = "12:00:00";
-      if (window.DateHelper && dateVal === window.DateHelper.getTodayWIBString()) {
-        txTime = new Date().toTimeString().split(" ")[0];
-      }
-      const updatedDate = dateVal ? `${dateVal}T${txTime}+07:00` : new Date().toISOString();
+      const updatedDate = window.DateHelper && window.DateHelper.toWIBISOString ?
+        window.DateHelper.toWIBISOString(dateVal) :
+        (dateVal ? `${dateVal}T12:00:00+07:00` : new Date().toISOString());
 
       window.AppModule.updateTransaction(id, {
         date: updatedDate,
@@ -1095,11 +1075,9 @@
         return;
       }
 
-      let txTime = "12:00:00";
-      if (window.DateHelper && dateVal === window.DateHelper.getTodayWIBString()) {
-        txTime = new Date().toTimeString().split(" ")[0];
-      }
-      const updatedDate = dateVal ? `${dateVal}T${txTime}+07:00` : new Date().toISOString();
+      const updatedDate = window.DateHelper && window.DateHelper.toWIBISOString ?
+        window.DateHelper.toWIBISOString(dateVal) :
+        (dateVal ? `${dateVal}T12:00:00+07:00` : new Date().toISOString());
 
       window.AppModule.updateIbuTransaction(id, {
         date: updatedDate,
@@ -1213,6 +1191,7 @@
       document.getElementById("numpadDisplay").textContent = "0";
       document.getElementById("txNoteInput").value = "";
       document.getElementById("txDateInput").value = window.DateHelper ? window.DateHelper.getTodayWIBString() : new Date().toISOString().split("T")[0];
+      populateCategorySelect();
       document.getElementById("quickAddModal").classList.remove("hidden");
     }
 
@@ -1228,13 +1207,15 @@
       }
 
       const catFull = document.getElementById("txCategorySelect").value;
-      const [category, subCategory] = catFull.split(" - ");
+      const [category, subCategory] = catFull ? (catFull.includes(" - ") ? catFull.split(" - ") : [catFull, ""]) : ["Lainnya", ""];
       const wallet = document.getElementById("txWalletSelect").value;
       const user = document.getElementById("txUserSelect").value;
       const note = document.getElementById("txNoteInput").value;
 
       const dateInput = document.getElementById("txDateInput").value;
-      const txDate = dateInput ? dateInput + "T" + new Date().toTimeString().split(" ")[0] + "+07:00" : new Date().toISOString();
+      const txDate = window.DateHelper && window.DateHelper.toWIBISOString ?
+        window.DateHelper.toWIBISOString(dateInput) :
+        (dateInput ? dateInput + "T" + new Date().toTimeString().split(" ")[0] + "+07:00" : new Date().toISOString());
 
       const tx = window.AppModule.addTransaction({
         date: txDate,
@@ -1246,6 +1227,17 @@
         user,
         note
       });
+
+      // Jika mencatat backdate di luar rentang filter aktif, reset filter agar transaksi langsung nampak
+      const startEl = document.getElementById("filterStartDate");
+      const endEl = document.getElementById("filterEndDate");
+      if (dateInput && ((startEl && startEl.value) || (endEl && endEl.value))) {
+        if ((startEl && startEl.value && dateInput < startEl.value) || (endEl && endEl.value && dateInput > endEl.value)) {
+          if (startEl) startEl.value = "";
+          if (endEl) endEl.value = "";
+          handleSearchAndFilterChange();
+        }
+      }
 
       closeQuickAddModal();
       
